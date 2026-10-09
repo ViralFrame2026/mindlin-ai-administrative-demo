@@ -89,6 +89,8 @@ La migración y las garantías de integridad están documentadas en [`docs/admin
 
 Las mejoras de navegación, accesibilidad, búsqueda y CSV se describen en [`docs/professional-administrative-ux.md`](docs/professional-administrative-ux.md).
 
+El formato CSV regional, la protección contra fórmulas y la validación pendiente en Excel están documentados en [`docs/excel-compatible-csv.md`](docs/excel-compatible-csv.md).
+
 ## Pruebas cubiertas
 
 - Extracción real de cuatro PDFs digitales con órdenes y etiquetas diferentes.
