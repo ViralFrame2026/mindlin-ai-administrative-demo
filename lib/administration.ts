@@ -1,3 +1,4 @@
+import { assignAdministrativeIds } from "./administrative-ids";
 import { STATUS_LABELS } from "./presentation";
 import { DEMO_HISTORY, DEMO_INVOICES } from "./demo-data";
 import {
@@ -44,7 +45,7 @@ export function initialState(
       rules,
       history,
     });
-    return {
+    return assignAdministrativeIds({
       ...checked,
       invoices: checked.invoices.map((invoice) => ({
         ...invoice,
@@ -57,7 +58,7 @@ export function initialState(
           invoice.pdfHash,
         ),
       })),
-    };
+    });
   } catch (cause) {
     console.error(
       "[local-migration] Datos conservados; migración detenida",
@@ -113,8 +114,10 @@ export function addAdministrativeInvoice(
   if (invoice.extractionWarnings?.length && !invoice.extractionConfirmed)
     throw new Error("Confirmá manualmente las advertencias de extracción.");
   const retention = calculateRetentions(invoice.amounts, state.rules);
+  const current = assignAdministrativeIds(state);
   const pending = {
     ...initializeInvoiceWorkflow(invoice),
+    administrativeId: undefined,
     validation,
     revision: 0,
     retentionRulesVersion: state.rulesVersion,
@@ -122,9 +125,9 @@ export function addAdministrativeInvoice(
     retentionLines: retention.lines,
     retentionTotal: retention.total,
   };
-  return {
-    ...state,
-    invoices: [pending, ...state.invoices],
+  return assignAdministrativeIds({
+    ...current,
+    invoices: [pending, ...current.invoices],
     history: [
       event(
         "uploaded",
@@ -134,9 +137,9 @@ export function addAdministrativeInvoice(
           invoiceNumber: `${invoice.pointOfSale}-${invoice.number}`,
         },
       ),
-      ...state.history,
+      ...current.history,
     ],
-  };
+  });
 }
 export function changeAdministrativeStatus(
   state: AdministrativeState,
@@ -168,6 +171,7 @@ export function changeAdministrativeStatus(
         `Factura ${original.pointOfSale}-${original.number}: ${STATUS_LABELS[original.status]} → ${STATUS_LABELS[target]}.`,
         {
           invoiceId: id,
+          administrativeId: original.administrativeId,
           invoiceNumber: `${original.pointOfSale}-${original.number}`,
           fromStatus: original.status,
           toStatus: target,
@@ -241,6 +245,7 @@ export function recalculateAdministrativeInvoice(
         `Recálculo explícito: ${original.retentionTotal} → ${next.retentionTotal} ARS; reglas v${original.retentionRulesVersion ?? 1} → v${state.rulesVersion}.`,
         {
           invoiceId: id,
+          administrativeId: original.administrativeId,
           reason: reason.trim(),
           before: {
             total: original.retentionTotal,

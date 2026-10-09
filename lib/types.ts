@@ -38,6 +38,7 @@ export interface RetentionLine {
 
 export interface Invoice {
   id: string;
+  administrativeId?: string;
   number: string;
   type: string;
   pointOfSale: string;
@@ -107,6 +108,7 @@ export interface HistoryEntry {
   timestamp: string;
   actor: string;
   invoiceId?: string;
+  administrativeId?: string;
   invoiceNumber?: string;
   reason?: string;
   fromStatus?: InvoiceStatus;

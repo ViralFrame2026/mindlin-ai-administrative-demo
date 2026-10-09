@@ -1,3 +1,4 @@
+import { assignAdministrativeIds } from "./administrative-ids";
 import { parseState, type AdministrativeState } from "./state-schema";
 const DB_NAME = "mindlin-ai-demo";
 const PDF_STORE = "pdf-files";
@@ -60,20 +61,64 @@ export async function transactState(
     return await new Promise((resolve, reject) => {
       const tx = db.transaction([STATE_STORE, PDF_STORE], "readwrite");
       const store = tx.objectStore(STATE_STORE);
+      const counterRequest = store.get("administrative-sequence");
       const request = store.get("current");
       let result: AdministrativeState;
       let failure: unknown;
       request.onsuccess = () => {
         try {
-          const current = request.result
+          const rawCurrent = request.result
             ? parseState(request.result)
             : parseState(initialize());
-          result = operation
+          const counter = counterRequest.result ?? 1;
+          if (!Number.isSafeInteger(counter) || counter < 1)
+            throw new Error(
+              "Contador administrativo inválido. Se requiere recuperación.",
+            );
+          const current = assignAdministrativeIds(rawCurrent, counter);
+          const operated = operation
             ? parseState({
                 ...operation(current, tx.objectStore(PDF_STORE)),
                 revision: current.revision + 1,
               })
             : current;
+          for (const invoice of operated.invoices) {
+            const previous = current.invoices.find(
+              (item) => item.id === invoice.id,
+            );
+            if (
+              previous &&
+              invoice.administrativeId &&
+              invoice.administrativeId !== previous.administrativeId
+            )
+              throw new Error(
+                "No se puede modificar el ID administrativo de una factura.",
+              );
+            if (previous && !invoice.administrativeId)
+              invoice.administrativeId = previous.administrativeId;
+            if (!previous && invoice.administrativeId)
+              invoice.administrativeId = undefined;
+          }
+          const newIds = new Set(
+            operated.invoices
+              .filter(
+                (item) => !current.invoices.some((old) => old.id === item.id),
+              )
+              .map((item) => item.id),
+          );
+          result = assignAdministrativeIds(
+            {
+              ...operated,
+              nextAdministrativeNumber: current.nextAdministrativeNumber,
+              history: operated.history.map((entry) =>
+                newIds.has(entry.invoiceId ?? "")
+                  ? { ...entry, administrativeId: undefined }
+                  : entry,
+              ),
+            },
+            current.nextAdministrativeNumber,
+          );
+          store.put(result.nextAdministrativeNumber, "administrative-sequence");
           store.put(result, "current");
         } catch (error) {
           failure = error;

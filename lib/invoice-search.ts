@@ -10,6 +10,7 @@ export function matchesInvoiceSearch(invoice: Invoice, query: string) {
   const needle = normalize(query);
   if (!needle) return true;
   const fields = [
+    invoice.administrativeId ?? "",
     invoice.supplier.name,
     invoice.supplier.cuit,
     invoice.number,

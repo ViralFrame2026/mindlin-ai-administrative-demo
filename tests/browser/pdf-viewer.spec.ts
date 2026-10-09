@@ -43,6 +43,7 @@ async function seedLocalInvoice(page: Page, bytes?: number[]) {
           const invoice = {
             ...state.invoices[0],
             id: "browser-local-pdf",
+            administrativeId: undefined,
             pdfName: "Factura de prueba.pdf",
             pdfUrl: undefined,
             pdfStorageKey: "browser-local-file",
