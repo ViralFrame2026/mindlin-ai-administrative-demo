@@ -2,6 +2,7 @@ import type { ExtractedInvoiceData } from "./types";
 
 export interface PdfExtractionApiResult {
   data: ExtractedInvoiceData;
+  warnings: string[];
   pages: number;
   textPreview: string;
   requestId?: string;
@@ -121,8 +122,8 @@ export async function parsePdfExtractionResponse(response: Response): Promise<Pd
       responsePreview: preview,
     });
   }
-
-  return payload as PdfExtractionApiResult;
+  const result = payload as PdfExtractionApiResult;
+  return { ...result, warnings: Array.isArray(result.warnings) ? result.warnings : [] };
 }
 
 export async function requestPdfExtraction(

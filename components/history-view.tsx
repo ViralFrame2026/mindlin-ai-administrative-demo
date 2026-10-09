@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, Download, FilePlus2, History, RotateCcw, Settings2, XCircle } from "lucide-react";
+import { CheckCircle2, Clock3, Download, FilePlus2, History, RotateCcw, Settings2, XCircle } from "lucide-react";
 import { historyToCsv } from "@/lib/csv";
 import { useAppStore } from "@/lib/store";
 import type { HistoryAction } from "@/lib/types";
@@ -11,6 +11,7 @@ import { PageHeader } from "./ui";
 const actionMeta: Record<HistoryAction, { label: string; icon: typeof History; style: string }> = {
   seeded: { label: "Datos preparados", icon: History, style: "bg-slate-100 text-slate-600" },
   uploaded: { label: "Factura cargada", icon: FilePlus2, style: "bg-blue-50 text-blue-600" },
+  review_started: { label: "Enviada a revisión", icon: Clock3, style: "bg-sky-50 text-sky-600" },
   approved: { label: "Aprobación", icon: CheckCircle2, style: "bg-emerald-50 text-emerald-600" },
   rejected: { label: "Rechazo", icon: XCircle, style: "bg-rose-50 text-rose-600" },
   rules_updated: { label: "Reglas actualizadas", icon: Settings2, style: "bg-violet-50 text-violet-600" },
@@ -45,6 +46,7 @@ export function HistoryView() {
                     <time className="text-xs font-medium text-slate-400">{formatDateTime(entry.timestamp)}</time>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{entry.description}</p>
+                  {entry.reason && <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800"><strong>Motivo:</strong> {entry.reason}</p>}
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400"><span>{entry.actor}</span>{entry.invoiceNumber && <><span>·</span><span className="font-semibold text-cobalt">{entry.invoiceNumber}</span></>}</div>
                 </div>
               </div>

@@ -8,15 +8,16 @@ import {
   CheckCircle2,
   Clock3,
   Download,
+  ExternalLink,
   FileText,
   LoaderCircle,
-  RotateCcw,
   ShieldCheck,
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getPdfBlob } from "@/lib/storage";
+import { createManagedPdfUrl, supportsInlinePdfPreview } from "@/lib/pdf-preview";
 import { useAppStore } from "@/lib/store";
 import { formatCurrency, formatDate, formatDateTime, formatFileSize } from "@/lib/utils";
 import { PageHeader, StatusBadge } from "./ui";
@@ -27,30 +28,57 @@ export function InvoiceDetail() {
   const invoice = invoices.find((item) => item.id === params.id);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState("");
+  const [inlinePreview, setInlinePreview] = useState(true);
   const [rejecting, setRejecting] = useState(false);
+  const [confirmingApproval, setConfirmingApproval] = useState(false);
   const [reason, setReason] = useState("");
+  const [workflowError, setWorkflowError] = useState("");
+  const transitionLock = useRef("");
 
   useEffect(() => {
+    setInlinePreview(supportsInlinePdfPreview(window.navigator.userAgent));
+  }, []);
+
+  useEffect(() => {
+    transitionLock.current = "";
+  }, [invoice?.status]);
+
+  useEffect(() => {
+    setPdfError("");
+    setPdfUrl(null);
+    setLoadingPdf(false);
     if (!invoice) return;
     if (invoice.pdfUrl) {
       setPdfUrl(invoice.pdfUrl);
       return;
     }
-    if (!invoice.pdfStorageKey) return;
-    let objectUrl: string | undefined;
+    if (!invoice.pdfStorageKey) {
+      setPdfError("El archivo PDF no está asociado a este comprobante.");
+      return;
+    }
+    let disposed = false;
+    let managedUrl: ReturnType<typeof createManagedPdfUrl> | undefined;
     setLoadingPdf(true);
     getPdfBlob(invoice.pdfStorageKey)
       .then((blob) => {
-        if (blob) {
-          objectUrl = URL.createObjectURL(blob);
-          setPdfUrl(objectUrl);
-        }
+        if (!blob) throw new Error("PDF_NOT_FOUND");
+        managedUrl = createManagedPdfUrl(blob);
+        if (disposed) managedUrl.release();
+        else setPdfUrl(managedUrl.url);
       })
-      .finally(() => setLoadingPdf(false));
+      .catch((error) => {
+        console.error("[pdf-viewer] No fue posible recuperar el archivo local", error);
+        if (!disposed) setPdfError("No fue posible recuperar el PDF guardado en este navegador.");
+      })
+      .finally(() => {
+        if (!disposed) setLoadingPdf(false);
+      });
     return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      disposed = true;
+      managedUrl?.release();
     };
-  }, [invoice]);
+  }, [invoice?.pdfStorageKey, invoice?.pdfUrl]);
 
   const invoiceHistory = useMemo(
     () => history.filter((entry) => entry.invoiceId === invoice?.id),
@@ -72,10 +100,21 @@ export function InvoiceDetail() {
   }
 
   const canApprove = !invoice.validation.errors.length && !invoice.validation.duplicate;
+  const changeStatus = (status: "needs_review" | "approved" | "rejected", rejectionReason?: string) => {
+    const transitionKey = `${invoice.status}:${status}`;
+    if (transitionLock.current === transitionKey) return false;
+    transitionLock.current = transitionKey;
+    setWorkflowError("");
+    const result = updateInvoiceStatus(invoice.id, status, rejectionReason);
+    if (!result.ok) {
+      transitionLock.current = "";
+      setWorkflowError(result.error || "No se pudo actualizar el estado.");
+    }
+    return result.ok;
+  };
   const submitRejection = () => {
     if (reason.trim().length < 5) return;
-    updateInvoiceStatus(invoice.id, "rejected", reason.trim());
-    setRejecting(false);
+    if (changeStatus("rejected", reason.trim())) setRejecting(false);
   };
 
   return (
@@ -92,14 +131,16 @@ export function InvoiceDetail() {
         <section className="panel overflow-hidden xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)]">
           <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
             <div className="min-w-0"><p className="truncate text-sm font-bold text-navy">{invoice.pdfName}</p><p className="mt-0.5 text-xs text-slate-500">{invoice.pages} página{invoice.pages === 1 ? "" : "s"} · {formatFileSize(invoice.pdfSize)}</p></div>
-            {pdfUrl && <a href={pdfUrl} download={invoice.pdfName} className="btn-secondary !min-h-9 !px-3 !py-1.5"><Download className="size-4" /><span className="hidden sm:inline">Descargar</span></a>}
+            {pdfUrl && <div className="flex gap-2"><a href={pdfUrl} target="_blank" rel="noreferrer" className="btn-secondary !min-h-9 !px-3 !py-1.5"><ExternalLink className="size-4" /><span className="hidden sm:inline">Abrir</span></a><a href={pdfUrl} download={invoice.pdfName} className="btn-secondary !min-h-9 !px-3 !py-1.5"><Download className="size-4" /><span className="hidden sm:inline">Descargar</span></a></div>}
           </div>
           {loadingPdf ? (
             <div className="grid h-[600px] place-items-center bg-slate-100"><LoaderCircle className="size-7 animate-spin text-cobalt" /></div>
-          ) : pdfUrl ? (
+          ) : pdfUrl && inlinePreview ? (
             <iframe src={pdfUrl} title={`PDF de factura ${invoice.number}`} className="h-[640px] w-full bg-slate-100 xl:h-[calc(100%-66px)]" />
+          ) : pdfUrl ? (
+            <div className="grid h-[600px] place-items-center bg-slate-50 p-8 text-center"><div><FileText className="mx-auto size-10 text-cobalt" /><p className="mt-4 text-sm font-bold text-navy">Vista previa no disponible en este navegador</p><p className="mt-2 max-w-sm text-xs leading-5 text-slate-500">En Android podés abrir el documento con el visor instalado o descargarlo sin enviarlo a servicios externos.</p><div className="mt-5 flex justify-center gap-2"><a href={pdfUrl} target="_blank" rel="noreferrer" className="btn-primary"><ExternalLink className="size-4" />Abrir PDF</a><a href={pdfUrl} download={invoice.pdfName} className="btn-secondary"><Download className="size-4" />Descargar</a></div></div></div>
           ) : (
-            <div className="grid h-[600px] place-items-center bg-slate-50 p-8 text-center"><div><AlertTriangle className="mx-auto size-8 text-amber-500" /><p className="mt-3 text-sm font-semibold text-slate-600">El PDF local ya no está disponible.</p><p className="mt-1 text-xs text-slate-500">Los metadatos se conservaron, pero IndexedDB fue limpiado.</p></div></div>
+            <div className="grid h-[600px] place-items-center bg-slate-50 p-8 text-center"><div><AlertTriangle className="mx-auto size-8 text-amber-500" /><p className="mt-3 text-sm font-semibold text-slate-600">El PDF no está disponible.</p><p className="mt-1 text-xs text-slate-500">{pdfError || "Los metadatos se conservaron, pero el archivo local no pudo recuperarse."}</p></div></div>
           )}
         </section>
 
@@ -112,18 +153,20 @@ export function InvoiceDetail() {
               <DataItem label="Importe neto" value={formatCurrency(invoice.amounts.net)} />
               <DataItem label="IVA" value={formatCurrency(invoice.amounts.vat)} />
             </div>
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <button
-                onClick={() => updateInvoiceStatus(invoice.id, "approved")}
-                disabled={!canApprove || invoice.status === "approved"}
-                className="btn-primary flex-1 !bg-emerald-600 hover:!bg-emerald-700"
-              >
-                <Check className="size-4" /> {invoice.status === "approved" ? "Aprobada" : "Aprobar"}
-              </button>
-              <button onClick={() => setRejecting(true)} disabled={invoice.status === "rejected"} className="btn-secondary flex-1 !border-rose-200 !text-rose-700 hover:!bg-rose-50"><X className="size-4" /> Rechazar</button>
-            </div>
-            {!canApprove && <p className="mt-3 text-xs leading-5 text-amber-700">La aprobación está bloqueada mientras existan errores críticos o un duplicado detectado.</p>}
+            {invoice.status === "pending" && <button onClick={() => changeStatus("needs_review")} className="btn-primary mt-5 w-full"><Clock3 className="size-4" />Enviar a revisión</button>}
+            {invoice.status === "needs_review" && <div className="mt-5 flex flex-col gap-3 sm:flex-row"><button onClick={() => setConfirmingApproval(true)} disabled={!canApprove} className="btn-primary flex-1 !bg-emerald-600 hover:!bg-emerald-700"><Check className="size-4" />Aprobar</button><button onClick={() => setRejecting(true)} className="btn-secondary flex-1 !border-rose-200 !text-rose-700 hover:!bg-rose-50"><X className="size-4" />Rechazar</button></div>}
+            {(invoice.status === "approved" || invoice.status === "rejected") && <p className="mt-5 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">Decisión final registrada. Esta demo no permite reabrir una factura aprobada o rechazada.</p>}
+            {!canApprove && invoice.status === "needs_review" && <p className="mt-3 text-xs leading-5 text-amber-700">La aprobación está bloqueada mientras existan errores críticos o un duplicado detectado.</p>}
+            {workflowError && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">{workflowError}</p>}
           </section>
+
+          {confirmingApproval && (
+            <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+              <h2 className="text-sm font-bold text-emerald-900">Confirmar aprobación</h2>
+              <p className="mt-2 text-xs leading-5 text-emerald-800">Vas a registrar una decisión final para {invoice.pointOfSale}-{invoice.number}. Esta acción no es automática.</p>
+              <div className="mt-4 flex justify-end gap-2"><button onClick={() => setConfirmingApproval(false)} className="btn-secondary">Cancelar</button><button onClick={() => { if (changeStatus("approved")) setConfirmingApproval(false); }} className="btn-primary !bg-emerald-600"><Check className="size-4" />Confirmar aprobación</button></div>
+            </section>
+          )}
 
           {rejecting && (
             <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5">

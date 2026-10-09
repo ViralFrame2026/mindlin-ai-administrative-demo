@@ -1,20 +1,24 @@
 # Mindlin AI — Administrative Automation
 
-Prototipo funcional de un dashboard administrativo para cargar, extraer, validar y aprobar facturas argentinas en PDF. Construido con Next.js, TypeScript y Tailwind CSS, listo para desplegar en Vercel.
+Demo comercial 2.0 de un circuito administrativo para cargar, extraer, validar, revisar y decidir facturas argentinas en PDF. Construida con Next.js, TypeScript y Tailwind CSS, lista para desplegar en Vercel.
 
 ## Funcionalidades
 
 - Dashboard responsive con métricas, cola de trabajo y estado del circuito.
 - Carga, vista previa y descarga de facturas PDF.
 - Extracción real de la capa de texto mediante `pdf2json` en una Route Handler de Node.js, sin canvas ni APIs gráficas del navegador.
-- Interpretación editable de proveedor, CUIT, comprobante, fechas e importes.
+- Interpretación editable de emisor, CUIT, tipo, punto de venta, número, fechas e importes.
+- Priorización del emisor frente al receptor, números combinados o separados y advertencias ante datos ambiguos.
 - Validación del dígito verificador de CUIT y consistencia `neto + IVA = total`.
 - Detección de duplicados por hash SHA-256 o por CUIT + punto de venta + número.
 - Retenciones demostrativas configurables, con mínimos, alícuotas y base neta/total.
-- Aprobación y rechazo con motivo y trazabilidad.
+- Circuito obligatorio `Pendiente → En revisión → Aprobada/Rechazada`, confirmación explícita de aprobación y motivo obligatorio de rechazo.
+- Trazabilidad de actor demo, fecha, hora, acción, cambio de estado y motivo.
 - Historial de operaciones y exportación CSV de facturas o actividad.
 - Persistencia del estado en `localStorage` y de PDFs cargados en IndexedDB.
-- Cuatro facturas ficticias incluidas para una demostración grabada.
+- Visor del PDF local con alternativas de apertura y descarga; en Android evita mostrar un marco vacío.
+- Cuatro facturas ficticias de construcción, arquitectura, mantenimiento y logística, matemáticamente consistentes.
+- Carga de ejemplos con un clic: los PDFs recorren el endpoint y el extractor real, sin precargar campos.
 
 ## Ejecutar localmente
 
@@ -44,12 +48,23 @@ npm run generate:samples
 ## Probar la extracción real
 
 1. Ir a **Facturas → Nueva factura**.
-2. Descargar uno de los PDFs ficticios ofrecidos en la misma pantalla.
-3. Volver a cargar ese archivo y elegir **Extraer información**.
-4. Revisar los campos detectados. Como el comprobante también existe en los datos iniciales, se mostrará la detección de duplicado.
-5. Para probar un alta sin duplicado, editar el número antes de guardar.
+2. En **PDFs ficticios para probar**, elegir **Usar** sobre cualquiera de los cuatro casos.
+3. La aplicación obtiene el binario y lo envía a `POST /api/extract-pdf`, exactamente como una carga local.
+4. Revisar los campos y las advertencias. Como el comprobante también existe en los datos iniciales, el duplicado queda bloqueado.
+5. Para probar un alta completa, cargar otro PDF o editar el número antes de guardar. Toda factura nueva se guarda como **Pendiente**.
 
-La ruta `POST /api/extract-pdf` recibe el binario PDF, extrae su texto con `pdf2json` y devuelve campos estructurados junto con una vista previa. La extracción no está hardcodeada contra los archivos de muestra. El tamaño máximo es 4 MB para respetar el límite de payload de Vercel Functions, incluido el margen del formulario multipart.
+La ruta `POST /api/extract-pdf` recibe el binario PDF, extrae su texto con `pdf2json` y devuelve campos estructurados, advertencias y una vista previa. La extracción no está hardcodeada contra los archivos de muestra. El tamaño máximo es 4 MB para respetar el límite de payload de Vercel Functions, incluido el margen del formulario multipart.
+
+El analizador reconoce comprobantes como `0004-00001842` y campos separados, tolera variaciones de orden y prioriza etiquetas explícitas de emisor/proveedor. Si encuentra candidatos equivalentes o no puede identificar un campo, no lo inventa: devuelve una advertencia y deja el dato editable.
+
+## Circuito de aprobación
+
+1. Una carga validada se persiste como **Pendiente**.
+2. Un usuario debe enviarla expresamente a **En revisión**.
+3. Desde allí puede abrir una confirmación de **Aprobación** o registrar un **Rechazo** con motivo obligatorio.
+4. Las decisiones finales no se reabren en este prototipo.
+
+El encabezado identifica a `María González · Demo`. No existe autenticación, autorización ni concurrencia multiusuario real.
 
 ## Persistencia y reinicio
 
@@ -58,7 +73,16 @@ Toda la información de la demo queda en el navegador:
 - Metadatos, reglas e historial: `localStorage`.
 - Binarios PDF subidos: IndexedDB.
 
-El botón **Reiniciar demo** restaura los datos ficticios y elimina PDFs que el usuario haya cargado. Al no existir backend, los datos no se sincronizan entre navegadores o dispositivos.
+El botón **Reiniciar demo** restaura las cuatro facturas ficticias, sus distintos estados y el historial demostrativo; también elimina los PDFs que el usuario haya cargado. Al no existir backend, los datos no se sincronizan entre navegadores o dispositivos.
+
+## Pruebas cubiertas
+
+- Extracción real de cuatro PDFs digitales con órdenes y etiquetas diferentes.
+- Priorización emisor/receptor, comprobantes combinados/separados y ausencia de valores inventados.
+- PDF multiconcepto, archivo dañado, límites y respuestas JSON defensivas.
+- Transiciones válidas e inválidas, rechazo sin motivo y bloqueo de aprobación de duplicados.
+- Selección de visor para escritorio/Android y liberación idempotente de URLs temporales.
+- Validación de CUIT, importes, duplicados y retenciones ilustrativas.
 
 ## Despliegue en Vercel
 
@@ -75,10 +99,10 @@ El diagnóstico y las garantías ante respuestas vacías o no JSON están docume
 ## Limitaciones explícitas del prototipo
 
 - Solo procesa PDFs digitales con capa de texto. No incorpora OCR para imágenes o documentos escaneados.
-- Los patrones de extracción cubren formatos argentinos frecuentes, pero no todas las variantes posibles. Los campos quedan editables por ese motivo.
+- Los patrones de extracción cubren formatos argentinos frecuentes, pero no todas las plantillas o tablas posibles. Los campos quedan editables y se señalan ambigüedades por ese motivo.
 - Las reglas de retención son **demostrativas y configurables**. No implementan cálculos fiscales oficiales, padrones, jurisdicciones, acumulados, certificados de exclusión ni normativa vigente.
 - CUIT e importes se validan localmente; no se consulta ARCA ni otro registro externo.
 - La persistencia local no reemplaza una base de datos, autenticación, permisos, firma digital ni auditoría inmutable.
-- La vista PDF depende del visor integrado del navegador.
+- La vista embebida depende del visor integrado del navegador. En Android se ofrecen apertura y descarga local como alternativa; el documento no se envía a visores externos.
 
 Para un entorno productivo se necesitarían backend persistente, almacenamiento de objetos, autenticación y roles, OCR, antivirus, cifrado, observabilidad e integración con fuentes fiscales/contables autorizadas.

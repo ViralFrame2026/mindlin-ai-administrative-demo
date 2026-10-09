@@ -12,7 +12,7 @@ import { PageHeader, StatusBadge } from "./ui";
 const filters: Array<{ value: "all" | InvoiceStatus; label: string }> = [
   { value: "all", label: "Todas" },
   { value: "pending", label: "Pendientes" },
-  { value: "needs_review", label: "A revisar" },
+  { value: "needs_review", label: "En revisión" },
   { value: "approved", label: "Aprobadas" },
   { value: "rejected", label: "Rechazadas" },
 ];

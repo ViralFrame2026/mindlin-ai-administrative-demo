@@ -60,6 +60,8 @@ export function validateInvoice(
 
   if (!data.supplierName.trim()) errors.push("No se pudo identificar la razón social del proveedor.");
   if (!cuitValid) errors.push("El CUIT no supera la validación de dígito verificador.");
+  if (!data.type.trim()) errors.push("No se pudo identificar el tipo de comprobante.");
+  if (!data.pointOfSale.trim()) errors.push("No se pudo identificar el punto de venta.");
   if (!data.number.trim()) errors.push("No se pudo identificar el número de comprobante.");
   if (!data.issueDate) errors.push("No se pudo identificar la fecha de emisión.");
   if (data.total <= 0) errors.push("El importe total debe ser mayor que cero.");

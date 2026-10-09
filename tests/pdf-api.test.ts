@@ -23,6 +23,20 @@ async function postPdf(file: File) {
 }
 
 describe("POST /api/extract-pdf", () => {
+  it.each([
+    ["factura-construccion-andina.pdf", { supplierName: "Construcciones Andinas S.A.", supplierCuit: "30-71500123-9", type: "A", pointOfSale: "0004", number: "00001842", net: 1_250_000, vat: 262_500, total: 1_512_500 }],
+    ["factura-arquitectura-urbana.pdf", { supplierName: "Arquitectura Urbana S.R.L.", supplierCuit: "30-71423456-7", type: "C", pointOfSale: "0016", number: "00000427", net: 480_000, vat: 0, total: 480_000 }],
+    ["factura-mantenimiento-integral.pdf", { supplierName: "Mantenimiento Integral S.A.", supplierCuit: "30-71654321-4", type: "A", pointOfSale: "0009", number: "00000763", net: 360_000, vat: 75_600, total: 435_600 }],
+    ["factura-logistica-sur.pdf", { supplierName: "Logistica Sur S.A.", supplierCuit: "30-69876543-3", type: "A", pointOfSale: "0007", number: "00004591", net: 610_000, vat: 128_100, total: 738_100 }],
+  ])("extrae la estructura real de %s", async (name, expected) => {
+    const response = await postPdf(await sampleFile(name));
+    const payload = await response.json();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(payload.data).toMatchObject(expected);
+    expect(payload.warnings).toEqual([]);
+  });
+
   it("extrae un PDF digital y siempre responde JSON", async () => {
     const response = await postPdf(await sampleFile("factura-servicios-norte.pdf"));
     expect(response.status).toBe(200);

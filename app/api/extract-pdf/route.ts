@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { parseInvoiceText } from "@/lib/extraction";
+import { analyzeInvoiceText } from "@/lib/extraction";
 import { MAX_PDF_FILE_SIZE, MAX_PDF_FILE_SIZE_LABEL } from "@/lib/pdf-constraints";
 import { createPdfTextExtractor, type PdfTextExtractor } from "@/lib/pdf-text-extractor";
 
@@ -133,9 +133,11 @@ export async function POST(request: Request) {
         requestId,
       );
     }
+    const analysis = analyzeInvoiceText(text);
     return jsonResponse(
       {
-        data: parseInvoiceText(text),
+        data: analysis.data,
+        warnings: analysis.warnings,
         pages: result.pages,
         textPreview: text.slice(0, 700),
       },

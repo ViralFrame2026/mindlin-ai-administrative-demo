@@ -1,11 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DEMO_HISTORY, DEMO_INVOICES } from "./demo-data";
 import { calculateRetentions, DEFAULT_RETENTION_RULES } from "./retention";
 import { clearPdfBlobs, savePdfBlob } from "./storage";
-import type { HistoryEntry, Invoice, InvoiceStatus, RetentionRule } from "./types";
+import { DEMO_ACTOR, type HistoryEntry, type Invoice, type InvoiceStatus, type RetentionRule } from "./types";
 import { uid } from "./utils";
+import { invoiceKey } from "./validation";
+import { initializeInvoiceWorkflow, transitionInvoice, validateStatusTransition } from "./workflow";
 
 const INVOICE_KEY = "mindlin.invoices.v1";
 const RULES_KEY = "mindlin.retention-rules.v1";
@@ -17,9 +19,14 @@ interface AppStoreValue {
   history: HistoryEntry[];
   hydrated: boolean;
   addInvoice: (invoice: Invoice, file: File) => Promise<void>;
-  updateInvoiceStatus: (invoiceId: string, status: InvoiceStatus, reason?: string) => void;
+  updateInvoiceStatus: (invoiceId: string, status: InvoiceStatus, reason?: string) => StatusUpdateResult;
   updateRules: (rules: RetentionRule[]) => void;
   resetDemo: () => Promise<void>;
+}
+
+export interface StatusUpdateResult {
+  ok: boolean;
+  error?: string;
 }
 
 const AppStore = createContext<AppStoreValue | null>(null);
@@ -38,6 +45,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [rules, setRules] = useState<RetentionRule[]>(DEFAULT_RETENTION_RULES);
   const [history, setHistory] = useState<HistoryEntry[]>(DEMO_HISTORY);
   const [hydrated, setHydrated] = useState(false);
+  const pendingAdds = useRef(new Set<string>());
 
   useEffect(() => {
     setInvoices(readStorage(INVOICE_KEY, DEMO_INVOICES));
@@ -60,50 +68,77 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const addInvoice = useCallback(async (invoice: Invoice, file: File) => {
     if (!invoice.pdfStorageKey) throw new Error("Falta la clave de almacenamiento del PDF.");
-    await savePdfBlob(invoice.pdfStorageKey, file);
-    setInvoices((current) => [invoice, ...current]);
-    setHistory((current) => [
-      {
-        id: uid("history"),
-        action: "uploaded",
-        description: `Factura ${invoice.pointOfSale}-${invoice.number} cargada y procesada desde PDF.`,
-        timestamp: new Date().toISOString(),
-        actor: "María González",
-        invoiceId: invoice.id,
-        invoiceNumber: `${invoice.pointOfSale}-${invoice.number}`,
-      },
-      ...current,
-    ]);
-  }, []);
+    const businessKey = invoiceKey(invoice);
+    const hashKey = invoice.pdfHash ? `hash:${invoice.pdfHash}` : "";
+    const duplicate = invoices.find(
+      (existing) => (invoice.pdfHash && existing.pdfHash === invoice.pdfHash) || invoiceKey(existing) === businessKey,
+    );
+    if (duplicate || pendingAdds.current.has(businessKey) || (hashKey && pendingAdds.current.has(hashKey))) {
+      throw new Error(duplicate
+        ? `La factura ya existe como ${duplicate.pointOfSale}-${duplicate.number}.`
+        : "La misma factura ya se está guardando.");
+    }
+    pendingAdds.current.add(businessKey);
+    if (hashKey) pendingAdds.current.add(hashKey);
+    const pendingInvoice = initializeInvoiceWorkflow(invoice);
+    try {
+      await savePdfBlob(invoice.pdfStorageKey, file);
+      setInvoices((current) => [pendingInvoice, ...current]);
+      setHistory((current) => [
+        {
+          id: uid("history"),
+          action: "uploaded",
+          description: `Factura ${invoice.pointOfSale}-${invoice.number} cargada desde PDF en estado Pendiente.`,
+          timestamp: new Date().toISOString(),
+          actor: DEMO_ACTOR,
+          invoiceId: invoice.id,
+          invoiceNumber: `${invoice.pointOfSale}-${invoice.number}`,
+        },
+        ...current,
+      ]);
+    } finally {
+      pendingAdds.current.delete(businessKey);
+      if (hashKey) pendingAdds.current.delete(hashKey);
+    }
+  }, [invoices]);
 
   const updateInvoiceStatus = useCallback(
     (invoiceId: string, status: InvoiceStatus, reason?: string) => {
       const target = invoices.find((invoice) => invoice.id === invoiceId);
-      if (!target) return;
+      if (!target) return { ok: false, error: "No se encontró la factura." };
+      const validation = validateStatusTransition(target, status, reason);
+      if (!validation.allowed) return { ok: false, error: validation.error };
       const timestamp = new Date().toISOString();
       setInvoices((current) =>
         current.map((invoice) =>
           invoice.id === invoiceId
-            ? { ...invoice, status, rejectionReason: status === "rejected" ? reason : undefined, updatedAt: timestamp }
+            ? transitionInvoice(invoice, status, reason, timestamp)
             : invoice,
         ),
       );
-      const action = status === "approved" ? "approved" : "rejected";
+      const action = status === "needs_review" ? "review_started" : status === "approved" ? "approved" : "rejected";
+      const invoiceNumber = `${target.pointOfSale}-${target.number}`;
+      const description = status === "needs_review"
+        ? `Factura ${invoiceNumber} enviada a revisión administrativa.`
+        : status === "approved"
+          ? `Factura ${invoiceNumber} aprobada por confirmación explícita.`
+          : `Factura ${invoiceNumber} rechazada. Motivo: ${reason?.trim()}.`;
       setHistory((current) => [
         {
           id: uid("history"),
           action,
-          description:
-            status === "approved"
-              ? `Factura ${target.pointOfSale}-${target.number} aprobada por el circuito administrativo.`
-              : `Factura ${target.pointOfSale}-${target.number} rechazada. Motivo: ${reason || "Sin detalle"}.`,
+          description,
           timestamp,
-          actor: "María González",
+          actor: DEMO_ACTOR,
           invoiceId,
-          invoiceNumber: `${target.pointOfSale}-${target.number}`,
+          invoiceNumber,
+          reason: status === "rejected" ? reason?.trim() : undefined,
+          fromStatus: target.status,
+          toStatus: status,
         },
         ...current,
       ]);
+      return { ok: true };
     },
     [invoices],
   );
@@ -122,7 +157,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         action: "rules_updated",
         description: "Se actualizaron las reglas demostrativas de retención y se recalcularon las facturas.",
         timestamp: new Date().toISOString(),
-        actor: "María González",
+        actor: DEMO_ACTOR,
       },
       ...current,
     ]);
@@ -138,7 +173,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         action: "demo_reset",
         description: "Se restauraron los datos ficticios de la demostración.",
         timestamp: new Date().toISOString(),
-        actor: "María González",
+        actor: DEMO_ACTOR,
       },
       ...DEMO_HISTORY,
     ]);

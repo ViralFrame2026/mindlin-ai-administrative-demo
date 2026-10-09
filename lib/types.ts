@@ -1,6 +1,8 @@
 export type InvoiceStatus = "pending" | "needs_review" | "approved" | "rejected";
 export type InvoiceSource = "demo" | "uploaded";
 
+export const DEMO_ACTOR = "María González · usuario demo";
+
 export interface MoneyBreakdown {
   net: number;
   vat: number;
@@ -82,6 +84,7 @@ export interface RetentionRule {
 export type HistoryAction =
   | "seeded"
   | "uploaded"
+  | "review_started"
   | "approved"
   | "rejected"
   | "rules_updated"
@@ -95,4 +98,7 @@ export interface HistoryEntry {
   actor: string;
   invoiceId?: string;
   invoiceNumber?: string;
+  reason?: string;
+  fromStatus?: InvoiceStatus;
+  toStatus?: InvoiceStatus;
 }
