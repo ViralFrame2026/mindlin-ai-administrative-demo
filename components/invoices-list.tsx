@@ -32,7 +32,7 @@ export function InvoicesList() {
   }, [invoices, search, status]);
 
   const exportCsv = () => {
-    downloadTextFile(`\uFEFF${invoicesToCsv(visible)}`, "facturas-mindlin-ai.csv", "text/csv;charset=utf-8");
+    downloadTextFile(invoicesToCsv(visible), "facturas-mindlin-ai.csv", "text/csv;charset=utf-8");
   };
 
   return (

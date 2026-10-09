@@ -46,7 +46,7 @@ describe("CSV administrativo seguro", () => {
       },
     ]);
     expect(csv).toContain('"Servicios ""Sur"", S.A."');
-    expect(csv).toContain('"1512500.00"');
+    expect(csv).toContain(';1512500,00;');
     expect(csv).toContain('"Pendiente"');
     const history = historyToCsv([
       {

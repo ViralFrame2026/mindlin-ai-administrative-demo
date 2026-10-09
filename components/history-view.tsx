@@ -68,7 +68,7 @@ export function HistoryView() {
   const { history } = useAppStore();
   const exportCsv = () =>
     downloadTextFile(
-      `\uFEFF${historyToCsv(history)}`,
+      historyToCsv(history),
       "historial-mindlin-ai.csv",
       "text/csv;charset=utf-8",
     );
