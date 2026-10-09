@@ -6,6 +6,7 @@ async function persisted(page: Page) {
         invoices: Array<{
           id: string;
           status: string;
+          amounts: { net: number; vat: number; total: number };
           retentionTotal: number;
           retentionRulesVersion: number;
         }>;
@@ -349,3 +350,41 @@ test("reinicio confirmado conserva los ejemplos y registra la operación", async
   await page.reload();
   expect((await persisted(page)).history[0].action).toBe("demo_reset");
 });
+
+for (const sample of [
+  { label: /Construcción/, net: "1250000", vat: "262500", total: "1512500" },
+  { label: /Arquitectura/, net: "480000", vat: "0", total: "480000" },
+  { label: /Mantenimiento/, net: "360000", vat: "75600", total: "435600" },
+  { label: /Logística/, net: "610000", vat: "128100", total: "738100" },
+]) {
+  test(`extrae y guarda el PDF original ${sample.label}`, async ({ page }) => {
+    await page.goto("/facturas/nueva");
+    await page.getByRole("button", { name: sample.label }).click();
+    await expect(page.getByLabel("Importe neto", { exact: true })).toHaveValue(
+      sample.net,
+    );
+    // Zero VAT must be visible as a real zero, not a blank/missing field.
+    await expect(page.getByLabel("IVA", { exact: true })).toHaveValue(
+      sample.vat,
+    );
+    await expect(page.getByLabel("Total", { exact: true })).toHaveValue(
+      sample.total,
+    );
+    await page.getByLabel("Número", { exact: true }).fill("00009997");
+    await page.getByRole("button", { name: "Guardar como pendiente" }).click();
+    await expect(page.getByText("Total del comprobante")).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("Total del comprobante")).toBeVisible();
+    const state = await persisted(page);
+    expect(state.invoices).toHaveLength(5);
+    const saved = state.invoices.find(
+      (invoice) => !invoice.id.startsWith("demo-"),
+    )!;
+    expect(saved.status).toBe("pending");
+    expect(saved.amounts).toMatchObject({
+      net: Number(sample.net),
+      vat: Number(sample.vat),
+      total: Number(sample.total),
+    });
+  });
+}
