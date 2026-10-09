@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { DEMO_PDF_SAMPLES } from "@/lib/demo-data";
 import { PdfApiResponseError, requestPdfExtraction, type PdfExtractionApiResult } from "@/lib/pdf-api";
 import { MAX_PDF_FILE_SIZE, MAX_PDF_FILE_SIZE_LABEL } from "@/lib/pdf-constraints";
 import { calculateRetentions } from "@/lib/retention";
@@ -26,7 +27,7 @@ import { PageHeader } from "./ui";
 
 const EMPTY_DATA: ExtractedInvoiceData = {
   number: "",
-  type: "A",
+  type: "",
   pointOfSale: "",
   issueDate: "",
   dueDate: "",
@@ -48,6 +49,7 @@ export function UploadInvoice() {
   const [pdfHash, setPdfHash] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loadingExample, setLoadingExample] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
@@ -66,23 +68,30 @@ export function UploadInvoice() {
     [data, rules],
   );
 
+  const fileError = (selected: File) => {
+    if (selected.type !== "application/pdf" && !selected.name.toLowerCase().endsWith(".pdf")) {
+      return "Seleccioná un archivo con formato PDF.";
+    }
+    if (selected.size > MAX_PDF_FILE_SIZE) {
+      return `El archivo supera el máximo de ${MAX_PDF_FILE_SIZE_LABEL} permitido en producción.`;
+    }
+    return "";
+  };
+
   const chooseFile = (selected?: File) => {
-    if (!selected) return;
+    if (!selected) return false;
     setError("");
     setResult(null);
     setPdfHash("");
     setData(EMPTY_DATA);
-    if (selected.type !== "application/pdf" && !selected.name.toLowerCase().endsWith(".pdf")) {
-      setError("Seleccioná un archivo con formato PDF.");
+    const selectionError = fileError(selected);
+    if (selectionError) {
+      setError(selectionError);
       setFile(null);
-      return;
-    }
-    if (selected.size > MAX_PDF_FILE_SIZE) {
-      setError(`El archivo supera el máximo de ${MAX_PDF_FILE_SIZE_LABEL} permitido en producción.`);
-      setFile(null);
-      return;
+      return false;
     }
     setFile(selected);
+    return true;
   };
 
   const onInput = (event: ChangeEvent<HTMLInputElement>) => chooseFile(event.target.files?.[0]);
@@ -92,15 +101,14 @@ export function UploadInvoice() {
     chooseFile(event.dataTransfer.files?.[0]);
   };
 
-  const extract = async () => {
-    if (!file) return;
+  const extractFile = async (selected: File) => {
     setBusy(true);
     setError("");
     try {
-      const bytes = await file.arrayBuffer();
+      const bytes = await selected.arrayBuffer();
       const digest = await crypto.subtle.digest("SHA-256", bytes);
       const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-      const payload = await requestPdfExtraction(file);
+      const payload = await requestPdfExtraction(selected);
       setPdfHash(hash);
       setResult(payload);
       setData(payload.data);
@@ -124,6 +132,29 @@ export function UploadInvoice() {
     }
   };
 
+  const extract = async () => {
+    if (file) await extractFile(file);
+  };
+
+  const loadExample = async (sample: (typeof DEMO_PDF_SAMPLES)[number]) => {
+    setLoadingExample(sample.fileName);
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(sample.url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`No se pudo obtener el ejemplo (HTTP ${response.status}).`);
+      const exampleFile = new File([await response.blob()], sample.fileName, { type: "application/pdf" });
+      if (!chooseFile(exampleFile)) return;
+      await extractFile(exampleFile);
+    } catch (caught) {
+      console.error("[pdf-example] No fue posible cargar el PDF ficticio", caught);
+      setError("No fue posible cargar el ejemplo. Podés volver a intentarlo o seleccionar un PDF local.");
+    } finally {
+      setLoadingExample(null);
+      setBusy(false);
+    }
+  };
+
   const updateText = (field: keyof ExtractedInvoiceData, value: string) => {
     setData((current) => ({ ...current, [field]: value }));
   };
@@ -132,7 +163,7 @@ export function UploadInvoice() {
   };
 
   const save = async () => {
-    if (!file || !result || validation.errors.length) return;
+    if (!file || !result || validation.errors.length || validation.duplicate) return;
     setBusy(true);
     setError("");
     const id = uid("invoice");
@@ -146,7 +177,7 @@ export function UploadInvoice() {
       dueDate: data.dueDate || undefined,
       supplier: { name: data.supplierName, cuit: data.supplierCuit },
       amounts: { net: data.net, vat: data.vat, total: data.total, currency: "ARS" },
-      status: validation.duplicate || validation.warnings.length ? "needs_review" : "pending",
+      status: "pending",
       source: "uploaded",
       pdfName: file.name,
       pdfSize: file.size,
@@ -235,17 +266,20 @@ export function UploadInvoice() {
           <aside className="space-y-5">
             <div className="panel p-5 sm:p-6">
               <h2 className="font-bold text-navy">PDFs ficticios para probar</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">Descargá uno, luego cargalo arriba para verificar la extracción real y la detección de duplicados.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">Elegí un caso y lo enviaremos al mismo endpoint de extracción que procesa tus archivos.</p>
               <div className="mt-4 space-y-2">
-                {[
-                  ["Servicios Norte S.A.", "/samples/factura-servicios-norte.pdf"],
-                  ["Estudio Delta S.R.L.", "/samples/factura-estudio-delta.pdf"],
-                  ["Logística Sur S.A.", "/samples/factura-logistica-sur.pdf"],
-                  ["Materiales · múltiples conceptos", "/samples/factura-materiales-multiconcepto.pdf"],
-                ].map(([name, href]) => (
-                  <a key={href} href={href} download className="flex items-center gap-3 rounded-xl border border-line p-3 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50">
-                    <FileText className="size-4 text-cobalt" /><span className="flex-1">{name}</span><span className="text-xs text-cobalt">Descargar</span>
-                  </a>
+                {DEMO_PDF_SAMPLES.map((sample) => (
+                  <button
+                    key={sample.fileName}
+                    type="button"
+                    onClick={() => loadExample(sample)}
+                    disabled={busy}
+                    className="flex w-full items-center gap-3 rounded-xl border border-line p-3 text-left text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    {loadingExample === sample.fileName ? <LoaderCircle className="size-4 shrink-0 animate-spin text-cobalt" /> : <FileText className="size-4 shrink-0 text-cobalt" />}
+                    <span className="min-w-0 flex-1"><span className="block">{sample.label}</span><span className="mt-0.5 block text-xs font-normal text-slate-500">{sample.detail}</span></span>
+                    <span className="text-xs text-cobalt">Usar</span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -264,6 +298,7 @@ export function UploadInvoice() {
           <section className="space-y-5">
             <div className="panel p-5 sm:p-6">
               <div className="mb-5 flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-600"><CheckCircle2 className="size-5" /></span><div><h2 className="font-bold text-navy">Extracción completada</h2><p className="mt-1 text-sm text-slate-500">Revisá y corregí los campos antes de incorporar la factura.</p></div></div>
+              {result.warnings.map((warning) => <p key={warning} className="mb-3 flex gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800"><AlertCircle className="mt-0.5 size-4 shrink-0" />{warning}</p>)}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Razón social" value={data.supplierName} onChange={(value) => updateText("supplierName", value)} wide />
                 <Field label="CUIT" value={data.supplierCuit} onChange={(value) => updateText("supplierCuit", value)} />
@@ -302,9 +337,9 @@ export function UploadInvoice() {
             {error && <ErrorMessage message={error} />}
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Link href="/facturas" className="btn-secondary">Cancelar</Link>
-              <button onClick={save} disabled={busy || validation.errors.length > 0} className="btn-primary">
+              <button onClick={save} disabled={busy || validation.errors.length > 0 || validation.duplicate} className="btn-primary">
                 {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}
-                {busy ? "Guardando…" : validation.duplicate ? "Guardar para revisión" : "Confirmar factura"}
+                {busy ? "Guardando…" : validation.duplicate ? "Duplicado bloqueado" : "Guardar como pendiente"}
               </button>
             </div>
           </section>

@@ -35,7 +35,7 @@ export function PageHeader({
 
 const statusStyles: Record<InvoiceStatus, { label: string; className: string }> = {
   pending: { label: "Pendiente", className: "bg-amber-50 text-amber-700 ring-amber-600/15" },
-  needs_review: { label: "Revisar", className: "bg-blue-50 text-blue-700 ring-blue-600/15" },
+  needs_review: { label: "En revisión", className: "bg-blue-50 text-blue-700 ring-blue-600/15" },
   approved: { label: "Aprobada", className: "bg-emerald-50 text-emerald-700 ring-emerald-600/15" },
   rejected: { label: "Rechazada", className: "bg-rose-50 text-rose-700 ring-rose-600/15" },
 };

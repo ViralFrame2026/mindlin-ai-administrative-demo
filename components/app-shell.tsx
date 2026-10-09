@@ -123,7 +123,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
             <div className="flex items-center gap-2 border-l border-line pl-3">
               <span className="grid size-9 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">MG</span>
-              <span className="hidden text-sm font-semibold text-ink lg:inline">María González</span>
+              <span className="hidden text-sm font-semibold text-ink lg:inline">María González · Demo</span>
             </div>
           </div>
         </header>

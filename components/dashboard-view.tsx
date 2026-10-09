@@ -101,7 +101,7 @@ export function DashboardView() {
               {[
                 ["Aprobadas", statusCount("approved"), "bg-emerald-500"],
                 ["Pendientes", statusCount("pending"), "bg-amber-500"],
-                ["A revisar", statusCount("needs_review"), "bg-blue-500"],
+                ["En revisión", statusCount("needs_review"), "bg-blue-500"],
                 ["Rechazadas", statusCount("rejected"), "bg-rose-500"],
               ].map(([label, count, color]) => (
                 <div key={String(label)} className="flex items-center text-sm">

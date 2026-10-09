@@ -5,36 +5,84 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 const outputDirectory = join(process.cwd(), "public", "samples");
 
 const samples = [
-  { file: "factura-servicios-norte.pdf", type: "A", point: "0001", number: "00001234", date: "02/10/2026", due: "17/10/2026", supplier: "Servicios Norte S.A.", cuit: "30-71654321-4", net: "825.000,00", vat: "173.250,00", total: "998.250,00" },
-  { file: "factura-estudio-delta.pdf", type: "C", point: "0003", number: "00000872", date: "29/09/2026", due: "14/10/2026", supplier: "Estudio Delta S.R.L.", cuit: "30-71423456-7", net: "420.000,00", vat: "0,00", total: "420.000,00" },
-  { file: "factura-logistica-sur.pdf", type: "A", point: "0007", number: "00004591", date: "27/09/2026", due: "12/10/2026", supplier: "Logistica Sur S.A.", cuit: "30-69876543-3", net: "610.000,00", vat: "128.100,00", total: "738.100,00" },
-  { file: "factura-insumos-oficina.pdf", type: "B", point: "0012", number: "00000128", date: "25/09/2026", due: "10/10/2026", supplier: "Insumos Oficina AR", cuit: "27-23456789-1", net: "185.000,00", vat: "38.850,00", total: "223.850,00" },
   {
-    file: "factura-materiales-multiconcepto.pdf",
+    file: "factura-construccion-andina.pdf",
     type: "A",
-    point: "0021",
-    number: "00000341",
-    date: "06/10/2026",
-    due: "21/10/2026",
-    supplier: "Materiales Construccion Demo S.A.",
-    cuit: "30-71500123-9",
-    net: "1.250.000,00",
-    vat: "262.500,00",
-    total: "1.512.500,00",
-    concepts: [
-      "120 bolsas de cemento portland",
-      "8 metros cubicos de arena fina",
-      "4 pallets de ladrillo hueco",
-      "Transporte y descarga en obra",
+    supplier: "Construcciones Andinas S.A.",
+    meta: [
+      "DATOS DEL EMISOR",
+      "Razon Social del Emisor: Construcciones Andinas S.A.",
+      "CUIT del Emisor: 30-71500123-9",
+      "FACTURA A Nro. 0004-00001842",
+      "Fecha de emision: 06/10/2026",
+      "Fecha de vencimiento: 21/10/2026",
+      "DATOS DEL RECEPTOR",
+      "Razon Social: Desarrolladora Horizonte S.A.",
+      "CUIT: 30-71234567-8",
     ],
+    concepts: ["120 bolsas de cemento portland", "8 m3 de arena fina", "4 pallets de ladrillo hueco"],
+    amounts: [["Importe Neto Gravado", "1.250.000,00"], ["IVA 21 %", "262.500,00"], ["Importe Total", "1.512.500,00"]],
+  },
+  {
+    file: "factura-arquitectura-urbana.pdf",
+    type: "C",
+    supplier: "Arquitectura Urbana S.R.L.",
+    meta: [
+      "FACTURA C",
+      "DATOS DEL RECEPTOR",
+      "Razon Social: Desarrolladora Horizonte S.A.",
+      "CUIT: 30-71234567-8",
+      "DATOS DEL EMISOR",
+      "Razon Social: Arquitectura Urbana S.R.L.",
+      "CUIT: 30-71423456-7",
+      "Punto de Venta: 0016   Comp. Nro: 00000427",
+      "Emitida el: 04/10/2026   Vence: 19/10/2026",
+    ],
+    concepts: ["Anteproyecto ejecutivo torre residencial", "Documentacion municipal y computo"],
+    amounts: [["Subtotal", "480.000,00"], ["IVA", "0,00"], ["TOTAL", "480.000,00"]],
+  },
+  {
+    file: "factura-mantenimiento-integral.pdf",
+    type: "A",
+    supplier: "Mantenimiento Integral S.A.",
+    meta: [
+      "Tipo de comprobante: FACTURA A",
+      "Emisor: Mantenimiento Integral S.A.",
+      "CUIT Emisor: 30-71654321-4",
+      "P.V.: 0009",
+      "Numero: 00000763",
+      "Fecha emision: 03/10/2026",
+      "Vencimiento: 18/10/2026",
+      "Cliente: Desarrolladora Horizonte S.A.",
+      "CUIT Cliente: 30-71234567-8",
+    ],
+    concepts: ["Mantenimiento preventivo de ascensores", "Revision de bombas y tableros"],
+    amounts: [["Total Neto", "360.000,00"], ["Importe IVA", "75.600,00"], ["Total a Pagar", "435.600,00"]],
+  },
+  {
+    file: "factura-logistica-sur.pdf",
+    type: "A",
+    supplier: "Logistica Sur S.A.",
+    meta: [
+      "FACTURA A",
+      "Proveedor: Logistica Sur S.A.",
+      "CUIT: 30-69876543-3",
+      "Comprobante Nro: 0007-00004591",
+      "Fecha de emision: 27/09/2026",
+      "Fecha de vencimiento: 12/10/2026",
+      "Receptor: Desarrolladora Horizonte S.A.",
+      "CUIT Receptor: 30-71234567-8",
+    ],
+    concepts: ["Transporte de materiales a obra", "Descarga y movimiento interno", "Seguro de carga"],
+    amounts: [["Neto", "610.000,00"], ["IVA 21 %", "128.100,00"], ["Total Comprobante", "738.100,00"]],
   },
 ];
 
 async function createInvoice(sample) {
   const document = await PDFDocument.create();
-  document.setTitle(`Factura ${sample.point}-${sample.number}`);
-  document.setAuthor("Mindlin AI - Demo");
-  document.setSubject("Comprobante ficticio para demostracion");
+  document.setTitle(`Factura ficticia - ${sample.supplier}`);
+  document.setAuthor("Mindlin AI - Demo comercial 2.0");
+  document.setSubject("Comprobante ficticio sin validez fiscal");
   const page = document.addPage([595, 842]);
   const regular = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
@@ -42,37 +90,37 @@ async function createInvoice(sample) {
   const ink = rgb(0.09, 0.14, 0.22);
   const gray = rgb(0.38, 0.43, 0.5);
 
-  page.drawRectangle({ x: 0, y: 742, width: 595, height: 100, color: rgb(0.04, 0.11, 0.21) });
-  page.drawText("MINDLIN AI", { x: 42, y: 795, size: 18, font: bold, color: rgb(1, 1, 1) });
-  page.drawText("COMPROBANTE FICTICIO PARA DEMOSTRACION", { x: 42, y: 773, size: 9, font: regular, color: rgb(0.65, 0.75, 0.9) });
-  page.drawText(`FACTURA ${sample.type}`, { x: 465, y: 792, size: 22, font: bold, color: rgb(1, 1, 1) });
+  page.drawRectangle({ x: 0, y: 748, width: 595, height: 94, color: rgb(0.04, 0.11, 0.21) });
+  page.drawText("MINDLIN AI", { x: 42, y: 798, size: 18, font: bold, color: rgb(1, 1, 1) });
+  page.drawText("COMPROBANTE FICTICIO - SIN VALIDEZ FISCAL", { x: 42, y: 776, size: 9, font: regular, color: rgb(0.65, 0.75, 0.9) });
+  page.drawText(`FACTURA ${sample.type}`, { x: 458, y: 793, size: 21, font: bold, color: rgb(1, 1, 1) });
 
-  page.drawText(`Proveedor: ${sample.supplier}`, { x: 42, y: 690, size: 17, font: bold, color: ink });
-  page.drawText(`CUIT: ${sample.cuit}`, { x: 42, y: 660, size: 11, font: regular, color: gray });
-  page.drawText(`Comprobante Nro: ${sample.point}-${sample.number}`, { x: 42, y: 630, size: 11, font: regular, color: gray });
-  page.drawText(`Fecha de emision: ${sample.date}`, { x: 335, y: 660, size: 11, font: regular, color: gray });
-  page.drawText(`Fecha de vencimiento: ${sample.due}`, { x: 335, y: 630, size: 11, font: regular, color: gray });
-
-  page.drawRectangle({ x: 42, y: 520, width: 511, height: 54, color: rgb(0.95, 0.97, 1) });
-  page.drawText("Concepto", { x: 58, y: 543, size: 10, font: bold, color: blue });
-  const concepts = sample.concepts ?? ["Servicios profesionales y administrativos de ejemplo"];
-  concepts.forEach((concept, index) => {
-    page.drawText(concept, { x: 58, y: 500 - index * 21, size: 11, font: regular, color: ink });
+  sample.meta.forEach((line, index) => {
+    const heading = /^DATOS DEL/.test(line);
+    page.drawText(line, {
+      x: 42,
+      y: 710 - index * 24,
+      size: heading ? 9 : 10.5,
+      font: heading ? bold : regular,
+      color: heading ? blue : gray,
+    });
   });
 
-  const amountLines = [
-    ["Importe Neto Gravado", sample.net],
-    ["IVA 21 %", sample.vat],
-    ["Importe Total", sample.total],
-  ];
-  amountLines.forEach(([label, amount], index) => {
-    const y = (concepts.length > 1 ? 380 : 415) - index * 45;
-    page.drawText(`${label}:`, { x: 305, y, size: index === 2 ? 13 : 11, font: index === 2 ? bold : regular, color: index === 2 ? ink : gray });
-    page.drawText(`$ ${amount}`, { x: 462, y, size: index === 2 ? 13 : 11, font: index === 2 ? bold : regular, color: index === 2 ? blue : ink });
+  page.drawRectangle({ x: 42, y: 405, width: 511, height: 35, color: rgb(0.95, 0.97, 1) });
+  page.drawText("CONCEPTOS", { x: 56, y: 418, size: 9, font: bold, color: blue });
+  sample.concepts.forEach((concept, index) => {
+    page.drawText(concept, { x: 56, y: 382 - index * 20, size: 10.5, font: regular, color: ink });
   });
 
-  page.drawLine({ start: { x: 42, y: 110 }, end: { x: 553, y: 110 }, thickness: 1, color: rgb(0.86, 0.89, 0.93) });
-  page.drawText("Documento sin validez fiscal. Generado exclusivamente para probar la demo Mindlin AI.", { x: 42, y: 85, size: 9, font: regular, color: gray });
+  sample.amounts.forEach(([label, amount], index) => {
+    const y = 270 - index * 42;
+    const total = index === sample.amounts.length - 1;
+    page.drawText(`${label}:`, { x: 292, y, size: total ? 13 : 11, font: total ? bold : regular, color: total ? ink : gray });
+    page.drawText(`$ ${amount}`, { x: 450, y, size: total ? 13 : 11, font: total ? bold : regular, color: total ? blue : ink });
+  });
+
+  page.drawLine({ start: { x: 42, y: 92 }, end: { x: 553, y: 92 }, thickness: 1, color: rgb(0.86, 0.89, 0.93) });
+  page.drawText("Documento ficticio generado para la demo Mindlin AI. No representa una operacion real.", { x: 42, y: 68, size: 9, font: regular, color: gray });
   return document.save();
 }
 
