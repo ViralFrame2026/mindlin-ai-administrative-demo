@@ -15,18 +15,14 @@ import {
   X,
 } from "lucide-react";
 import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { PdfApiResponseError, requestPdfExtraction, type PdfExtractionApiResult } from "@/lib/pdf-api";
+import { MAX_PDF_FILE_SIZE, MAX_PDF_FILE_SIZE_LABEL } from "@/lib/pdf-constraints";
 import { calculateRetentions } from "@/lib/retention";
 import { useAppStore } from "@/lib/store";
 import type { ExtractedInvoiceData, Invoice } from "@/lib/types";
 import { uid, formatCurrency, formatFileSize } from "@/lib/utils";
 import { validateInvoice } from "@/lib/validation";
 import { PageHeader } from "./ui";
-
-type ApiResult = {
-  data: ExtractedInvoiceData;
-  pages: number;
-  textPreview: string;
-};
 
 const EMPTY_DATA: ExtractedInvoiceData = {
   number: "",
@@ -48,7 +44,7 @@ export function UploadInvoice() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [data, setData] = useState<ExtractedInvoiceData>(EMPTY_DATA);
-  const [result, setResult] = useState<ApiResult | null>(null);
+  const [result, setResult] = useState<PdfExtractionApiResult | null>(null);
   const [pdfHash, setPdfHash] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -81,8 +77,8 @@ export function UploadInvoice() {
       setFile(null);
       return;
     }
-    if (selected.size > 10 * 1024 * 1024) {
-      setError("El archivo supera el máximo de 10 MB.");
+    if (selected.size > MAX_PDF_FILE_SIZE) {
+      setError(`El archivo supera el máximo de ${MAX_PDF_FILE_SIZE_LABEL} permitido en producción.`);
       setFile(null);
       return;
     }
@@ -104,16 +100,25 @@ export function UploadInvoice() {
       const bytes = await file.arrayBuffer();
       const digest = await crypto.subtle.digest("SHA-256", bytes);
       const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-      const form = new FormData();
-      form.append("file", file);
-      const response = await fetch("/api/extract-pdf", { method: "POST", body: form });
-      const payload = (await response.json()) as ApiResult & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "No fue posible extraer el contenido.");
+      const payload = await requestPdfExtraction(file);
       setPdfHash(hash);
       setResult(payload);
       setData(payload.data);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Ocurrió un error al procesar el PDF.");
+      if (caught instanceof PdfApiResponseError) {
+        console.error("[pdf-upload] La API devolvió una respuesta inválida", {
+          message: caught.message,
+          status: caught.status,
+          code: caught.code,
+          requestId: caught.requestId,
+          contentType: caught.contentType,
+          responsePreview: caught.responsePreview,
+        });
+        setError(caught.userMessage);
+      } else {
+        console.error("[pdf-upload] Falló la solicitud de extracción", caught);
+        setError("No fue posible comunicarse con el servicio de extracción. Revisá tu conexión e intentá nuevamente.");
+      }
     } finally {
       setBusy(false);
     }
@@ -219,7 +224,7 @@ export function UploadInvoice() {
                   <h2 className="mt-4 text-lg font-bold text-navy">Arrastrá tu factura PDF</h2>
                   <p className="mt-2 text-sm text-slate-500">o seleccioná un archivo desde tu equipo</p>
                   <button className="btn-primary mt-5" onClick={() => inputRef.current?.click()}>Seleccionar PDF</button>
-                  <p className="mt-4 text-xs text-slate-400">PDF digital · máximo 10 MB · sin contraseña</p>
+                  <p className="mt-4 text-xs text-slate-400">PDF digital · máximo {MAX_PDF_FILE_SIZE_LABEL} · sin contraseña</p>
                 </div>
               )}
               <input ref={inputRef} type="file" accept="application/pdf,.pdf" onChange={onInput} className="sr-only" />
@@ -236,6 +241,7 @@ export function UploadInvoice() {
                   ["Servicios Norte S.A.", "/samples/factura-servicios-norte.pdf"],
                   ["Estudio Delta S.R.L.", "/samples/factura-estudio-delta.pdf"],
                   ["Logística Sur S.A.", "/samples/factura-logistica-sur.pdf"],
+                  ["Materiales · múltiples conceptos", "/samples/factura-materiales-multiconcepto.pdf"],
                 ].map(([name, href]) => (
                   <a key={href} href={href} download className="flex items-center gap-3 rounded-xl border border-line p-3 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50">
                     <FileText className="size-4 text-cobalt" /><span className="flex-1">{name}</span><span className="text-xs text-cobalt">Descargar</span>

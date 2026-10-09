@@ -49,7 +49,7 @@ npm run generate:samples
 4. Revisar los campos detectados. Como el comprobante también existe en los datos iniciales, se mostrará la detección de duplicado.
 5. Para probar un alta sin duplicado, editar el número antes de guardar.
 
-La ruta `POST /api/extract-pdf` recibe el binario PDF, extrae su texto con `pdf-parse` y devuelve campos estructurados junto con una vista previa. La extracción no está hardcodeada contra los archivos de muestra.
+La ruta `POST /api/extract-pdf` recibe el binario PDF, extrae su texto con `pdf-parse` y devuelve campos estructurados junto con una vista previa. La extracción no está hardcodeada contra los archivos de muestra. El tamaño máximo es 4 MB para respetar el límite de payload de Vercel Functions, incluido el margen del formulario multipart.
 
 ## Persistencia y reinicio
 
@@ -62,13 +62,15 @@ El botón **Reiniciar demo** restaura los datos ficticios y elimina PDFs que el 
 
 ## Despliegue en Vercel
 
-El proyecto usa el runtime Node.js para la extracción de PDF y no necesita configuración adicional:
+El proyecto usa el runtime Node.js para la extracción de PDF. `package.json` declara Node `>=22.3 <25`, compatible con `pdf-parse@2.4.5`:
 
 ```bash
 vercel
 ```
 
 En el panel de Vercel, conservar el framework detectado como Next.js y el comando de build `npm run build`.
+
+El diagnóstico y las garantías ante respuestas vacías o no JSON están documentados en [`docs/production-pdf-errors.md`](docs/production-pdf-errors.md).
 
 ## Limitaciones explícitas del prototipo
 

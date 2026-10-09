@@ -9,6 +9,25 @@ const samples = [
   { file: "factura-estudio-delta.pdf", type: "C", point: "0003", number: "00000872", date: "29/09/2026", due: "14/10/2026", supplier: "Estudio Delta S.R.L.", cuit: "30-71423456-7", net: "420.000,00", vat: "0,00", total: "420.000,00" },
   { file: "factura-logistica-sur.pdf", type: "A", point: "0007", number: "00004591", date: "27/09/2026", due: "12/10/2026", supplier: "Logistica Sur S.A.", cuit: "30-69876543-3", net: "610.000,00", vat: "128.100,00", total: "738.100,00" },
   { file: "factura-insumos-oficina.pdf", type: "B", point: "0012", number: "00000128", date: "25/09/2026", due: "10/10/2026", supplier: "Insumos Oficina AR", cuit: "27-23456789-1", net: "185.000,00", vat: "38.850,00", total: "223.850,00" },
+  {
+    file: "factura-materiales-multiconcepto.pdf",
+    type: "A",
+    point: "0021",
+    number: "00000341",
+    date: "06/10/2026",
+    due: "21/10/2026",
+    supplier: "Materiales Construccion Demo S.A.",
+    cuit: "30-71500123-9",
+    net: "1.250.000,00",
+    vat: "262.500,00",
+    total: "1.512.500,00",
+    concepts: [
+      "120 bolsas de cemento portland",
+      "8 metros cubicos de arena fina",
+      "4 pallets de ladrillo hueco",
+      "Transporte y descarga en obra",
+    ],
+  },
 ];
 
 async function createInvoice(sample) {
@@ -36,7 +55,10 @@ async function createInvoice(sample) {
 
   page.drawRectangle({ x: 42, y: 520, width: 511, height: 54, color: rgb(0.95, 0.97, 1) });
   page.drawText("Concepto", { x: 58, y: 543, size: 10, font: bold, color: blue });
-  page.drawText("Servicios profesionales y administrativos de ejemplo", { x: 58, y: 500, size: 12, font: regular, color: ink });
+  const concepts = sample.concepts ?? ["Servicios profesionales y administrativos de ejemplo"];
+  concepts.forEach((concept, index) => {
+    page.drawText(concept, { x: 58, y: 500 - index * 21, size: 11, font: regular, color: ink });
+  });
 
   const amountLines = [
     ["Importe Neto Gravado", sample.net],
@@ -44,7 +66,7 @@ async function createInvoice(sample) {
     ["Importe Total", sample.total],
   ];
   amountLines.forEach(([label, amount], index) => {
-    const y = 415 - index * 45;
+    const y = (concepts.length > 1 ? 380 : 415) - index * 45;
     page.drawText(`${label}:`, { x: 305, y, size: index === 2 ? 13 : 11, font: index === 2 ? bold : regular, color: index === 2 ? ink : gray });
     page.drawText(`$ ${amount}`, { x: 462, y, size: index === 2 ? 13 : 11, font: index === 2 ? bold : regular, color: index === 2 ? blue : ink });
   });
@@ -55,7 +77,12 @@ async function createInvoice(sample) {
 }
 
 await mkdir(outputDirectory, { recursive: true });
-for (const sample of samples) {
+const requestedFile = process.argv[2];
+const selectedSamples = requestedFile
+  ? samples.filter((sample) => sample.file === requestedFile)
+  : samples;
+if (!selectedSamples.length) throw new Error(`Unknown sample PDF: ${requestedFile}`);
+for (const sample of selectedSamples) {
   await writeFile(join(outputDirectory, sample.file), await createInvoice(sample));
 }
-console.log(`Generated ${samples.length} sample PDFs in public/samples.`);
+console.log(`Generated ${selectedSamples.length} sample PDF(s) in public/samples.`);
