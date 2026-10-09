@@ -54,7 +54,7 @@ export function InvoicesList() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <label className="relative block max-w-lg flex-1">
               <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-              <input aria-label="Buscar facturas" type="search" value={search} onChange={(event) => setSearch(event.target.value)} className="field pl-10" placeholder="Buscar por proveedor, CUIT o comprobante…" />
+              <input aria-label="Buscar facturas" type="search" value={search} onChange={(event) => setSearch(event.target.value)} className="field pl-10" placeholder="Buscar por ID, proveedor, CUIT o comprobante…" />
             </label>
             <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
               <Filter className="size-4 shrink-0 text-slate-400" />
@@ -94,7 +94,7 @@ export function InvoicesList() {
                       <span><strong className="block text-sm text-navy">{invoice.supplier.name}</strong><small className="mt-0.5 block text-xs text-slate-500">{invoice.supplier.cuit}</small></span>
                     </Link>
                   </td>
-                  <td className="px-5 py-4 text-sm font-semibold text-slate-700">{invoice.type} · {invoice.pointOfSale}-{invoice.number}</td>
+                  <td className="px-5 py-4 text-sm font-semibold text-slate-700">{invoice.administrativeId}<br />{invoice.type} · {invoice.pointOfSale}-{invoice.number}</td>
                   <td className="px-5 py-4 text-sm text-slate-500">{formatDate(invoice.issueDate)}</td>
                   <td className="px-5 py-4 text-right text-sm font-bold text-navy">{formatCurrency(invoice.amounts.total)}</td>
                   <td className="px-5 py-4 text-right text-sm text-slate-600">{formatCurrency(invoice.retentionTotal)}</td>
@@ -110,7 +110,7 @@ export function InvoicesList() {
             <Link key={invoice.id} href={`/facturas/${invoice.id}`} className="block p-4 active:bg-slate-50">
               <div className="flex items-start gap-3">
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600"><FileText className="size-5" /></span>
-                <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-navy">{invoice.supplier.name}</p><p className="mt-1 text-xs text-slate-500">{invoice.type} · {invoice.pointOfSale}-{invoice.number}</p></div>
+                <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-navy">{invoice.supplier.name}</p><p className="mt-1 text-xs text-slate-500">{invoice.administrativeId}<br />{invoice.type} · {invoice.pointOfSale}-{invoice.number}</p></div>
                 <StatusBadge status={invoice.status} />
               </div>
               <div className="mt-4 flex items-end justify-between border-t border-dashed border-line pt-3"><span className="text-xs text-slate-500">{formatDate(invoice.issueDate)}</span><strong className="text-sm text-navy">{formatCurrency(invoice.amounts.total)}</strong></div>

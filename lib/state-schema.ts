@@ -16,6 +16,7 @@ const rule = z
 const invoice = z
   .object({
     id: z.string(),
+    administrativeId: z.string().optional(),
     number: z.string(),
     type: z.string(),
     pointOfSale: z.string(),
@@ -70,6 +71,7 @@ const invoice = z
 const history = z
   .object({
     id: z.string(),
+    administrativeId: z.string().optional(),
     action: z.enum([
       "seeded",
       "uploaded",
@@ -89,6 +91,7 @@ const schema = z.object({
   schemaVersion: z.literal(2),
   revision: z.number().int().nonnegative(),
   rulesVersion: z.number().int().positive(),
+  nextAdministrativeNumber: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
   invoices: z.array(invoice),
   rules: z.array(rule),
   history: z.array(history),
@@ -97,6 +100,7 @@ export interface AdministrativeState {
   schemaVersion: 2;
   revision: number;
   rulesVersion: number;
+  nextAdministrativeNumber?: number;
   invoices: Invoice[];
   rules: RetentionRule[];
   history: HistoryEntry[];

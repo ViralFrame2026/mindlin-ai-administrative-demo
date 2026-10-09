@@ -90,6 +90,8 @@ test("descarga siete ejemplos con BOM, columnas regionales e importes intactos",
   const rows = readCsv(csv);
   expect(rows).toHaveLength(8);
   rows.forEach((row) => expect(row).toHaveLength(13));
+  expect(new Set(rows.slice(1).map(row => row[0])).size).toBe(7);
+  rows.slice(1).forEach(row => expect(row[0]).toMatch(/^FAC-\d{6}$/));
   invoices.forEach((invoice, index) => {
     expect(rows[index + 1][1]).toBe(`${invoice.pointOfSale}-${invoice.number}`);
     expect(rows[index + 1][5]).toBe(invoice.supplier.cuit);

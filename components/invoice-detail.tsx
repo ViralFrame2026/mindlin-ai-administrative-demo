@@ -151,8 +151,8 @@ export function InvoiceDetail() {
   return (
     <div>
       <PageHeader
-        eyebrow={`Factura ${invoice.type}`}
-        title={`${invoice.pointOfSale}-${invoice.number}`}
+        eyebrow={`Comprobante fiscal ${invoice.type} · ${invoice.pointOfSale}-${invoice.number}`}
+        title={invoice.administrativeId ?? "Factura"}
         description={`${invoice.supplier.name} · ${invoice.supplier.cuit}`}
         backHref="/facturas"
         actions={<StatusBadge status={invoice.status} />}

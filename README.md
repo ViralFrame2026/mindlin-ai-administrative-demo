@@ -122,3 +122,5 @@ El diagnóstico y las garantías ante respuestas vacías o no JSON están docume
 - El visor interno usa PDF.js en el navegador; los archivos y recursos permanecen en el mismo origen. La apertura del original depende del visor instalado en cada dispositivo.
 
 Para un entorno productivo se necesitarían backend persistente, almacenamiento de objetos, autenticación y roles, OCR, antivirus, cifrado, observabilidad e integración con fuentes fiscales/contables autorizadas.
+
+Los registros usan códigos administrativos locales `FAC-000001` independientes de sus UUID y números fiscales. Se asignan transaccionalmente y se migran datos anteriores sin reiniciar el almacén. Ver [identificadores administrativos y recuperación](docs/administrative-invoice-ids.md).

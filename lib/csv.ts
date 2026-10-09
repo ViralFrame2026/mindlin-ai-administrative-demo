@@ -53,7 +53,7 @@ export function invoicesToCsv(invoices: Invoice[]) {
     "Origen",
   ];
   const rows = invoices.map((invoice) => [
-    invoice.id,
+    invoice.administrativeId ?? "",
     receiptText(invoice.pointOfSale, invoice.number),
     invoice.type,
     invoice.issueDate,
@@ -87,7 +87,7 @@ export function historyToCsv(history: HistoryEntry[]) {
     entry.fromStatus ? STATUS_LABELS[entry.fromStatus] : "",
     entry.toStatus ? STATUS_LABELS[entry.toStatus] : "",
     entry.invoiceNumber ?? "",
-    traceDescription(entry.description),
+    entry.administrativeId ? `${entry.administrativeId} · ${traceDescription(entry.description)}` : traceDescription(entry.description),
     entry.reason ?? "",
     entry.actor,
   ]);
