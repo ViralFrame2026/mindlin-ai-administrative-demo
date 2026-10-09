@@ -17,7 +17,11 @@ describe("runtime Node del extractor PDF", () => {
       const lockfile = JSON.parse(
         await readFile(join(process.cwd(), "package-lock.json"), "utf8"),
       ) as { packages: Record<string, unknown> };
-      expect(lockfile.packages["node_modules/@napi-rs/canvas"]).toBeUndefined();
+      // PDF.js belongs to the client viewer. The server extractor must remain pdf2json
+      // and must not depend on the optional native canvas shipped with PDF.js.
+      expect(lockfile.packages["node_modules/pdf-parse"]).toBeUndefined();
+      const extractorSource = await readFile(join(process.cwd(), "lib", "pdf-text-extractor.ts"), "utf8");
+      expect(extractorSource).not.toMatch(/import\(["'](?:pdfjs-dist|@napi-rs\/canvas)/);
 
       const bytes = await readFile(
         join(process.cwd(), "public", "samples", "factura-materiales-multiconcepto.pdf"),

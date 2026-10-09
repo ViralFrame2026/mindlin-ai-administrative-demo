@@ -29,7 +29,7 @@ No se aprueba al cargar ni al validar. La aprobación requiere una segunda confi
 
 Los PDFs cargados se guardan en IndexedDB. La página de detalle crea una URL temporal, la revoca al cambiar de documento o desmontarse y registra errores técnicos en consola mientras muestra mensajes comprensibles. Los archivos de muestra se sirven desde el mismo origen. No se usa Google Docs ni otro visor externo.
 
-En escritorio se intenta la vista embebida. En Android se muestran acciones de apertura y descarga porque el soporte de PDF dentro de `iframe` no es consistente.
+El visor interno renderiza con PDF.js en canvas tanto en escritorio como en móvil. Incluye zoom, ajuste al ancho y navegación; no depende de `iframe` ni del visor nativo. Abrir y Descargar conservan acceso al PDF original.
 
 ## Casos ficticios
 

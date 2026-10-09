@@ -16,7 +16,7 @@ Demo comercial 2.0 de un circuito administrativo para cargar, extraer, validar, 
 - Trazabilidad de actor demo, fecha, hora, acción, cambio de estado y motivo.
 - Historial de operaciones y exportación CSV de facturas o actividad.
 - Persistencia del estado en `localStorage` y de PDFs cargados en IndexedDB.
-- Visor del PDF local con alternativas de apertura y descarga; en Android evita mostrar un marco vacío.
+- Visor PDF.js con páginas reales en canvas, zoom, navegación y ajuste responsive en móvil/escritorio, además de apertura y descarga del original.
 - Cuatro facturas ficticias de construcción, arquitectura, mantenimiento y logística, matemáticamente consistentes.
 - Carga de ejemplos con un clic: los PDFs recorren el endpoint y el extractor real, sin precargar campos.
 
@@ -38,6 +38,15 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+El visor tiene pruebas de navegador sobre el build de producción:
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+Los detalles del worker local, la privacidad, la emulación móvil y los comandos alternativos están en [`docs/mobile-pdf-viewer.md`](docs/mobile-pdf-viewer.md).
 
 Para regenerar los PDFs ficticios:
 
@@ -81,7 +90,7 @@ El botón **Reiniciar demo** restaura las cuatro facturas ficticias, sus distint
 - Priorización emisor/receptor, comprobantes combinados/separados y ausencia de valores inventados.
 - PDF multiconcepto, archivo dañado, límites y respuestas JSON defensivas.
 - Transiciones válidas e inválidas, rechazo sin motivo y bloqueo de aprobación de duplicados.
-- Selección de visor para escritorio/Android y liberación idempotente de URLs temporales.
+- Renderizado real en navegador de escritorio y Android emulado: canvas, navegación multipágina, zoom, recuperación de IndexedDB y liberación de workers/URLs temporales.
 - Validación de CUIT, importes, duplicados y retenciones ilustrativas.
 
 ## Despliegue en Vercel
@@ -103,6 +112,6 @@ El diagnóstico y las garantías ante respuestas vacías o no JSON están docume
 - Las reglas de retención son **demostrativas y configurables**. No implementan cálculos fiscales oficiales, padrones, jurisdicciones, acumulados, certificados de exclusión ni normativa vigente.
 - CUIT e importes se validan localmente; no se consulta ARCA ni otro registro externo.
 - La persistencia local no reemplaza una base de datos, autenticación, permisos, firma digital ni auditoría inmutable.
-- La vista embebida depende del visor integrado del navegador. En Android se ofrecen apertura y descarga local como alternativa; el documento no se envía a visores externos.
+- El visor interno usa PDF.js en el navegador; los archivos y recursos permanecen en el mismo origen. La apertura del original depende del visor instalado en cada dispositivo.
 
 Para un entorno productivo se necesitarían backend persistente, almacenamiento de objetos, autenticación y roles, OCR, antivirus, cifrado, observabilidad e integración con fuentes fiscales/contables autorizadas.

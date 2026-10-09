@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { createManagedPdfUrl, supportsInlinePdfPreview } from "../lib/pdf-preview";
+import { createManagedPdfUrl, pdfCanvasSize } from "../lib/pdf-preview";
 
 describe("visualización local de PDF", () => {
-  it("usa vista embebida en escritorio y alternativa segura en Android", () => {
-    expect(supportsInlinePdfPreview("Mozilla/5.0 (X11; Linux x86_64) Chrome/140")).toBe(true);
-    expect(supportsInlinePdfPreview("Mozilla/5.0 (Linux; Android 15) Chrome/140 Mobile")).toBe(false);
+  it("ajusta una página al ancho móvil y limita la memoria del canvas", () => {
+    const size = pdfCanvasSize(595, 842, 296, 1, 3);
+    expect(size.width).toBeLessThanOrEqual(272);
+    expect(size.ratio).toBeLessThanOrEqual(2);
+    const large = pdfCanvasSize(595, 842, 1600, 2.5, 4);
+    expect(large.pixelWidth * large.pixelHeight).toBeLessThanOrEqual(8_000_000);
+    expect(Math.max(large.pixelWidth, large.pixelHeight)).toBeLessThanOrEqual(4096);
   });
 
   it("libera cada URL temporal exactamente una vez", () => {

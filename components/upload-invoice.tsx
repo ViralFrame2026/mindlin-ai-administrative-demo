@@ -24,6 +24,7 @@ import type { ExtractedInvoiceData, Invoice } from "@/lib/types";
 import { uid, formatCurrency, formatFileSize } from "@/lib/utils";
 import { validateInvoice } from "@/lib/validation";
 import { PageHeader } from "./ui";
+import { PdfViewer } from "./pdf-viewer";
 
 const EMPTY_DATA: ExtractedInvoiceData = {
   number: "",
@@ -290,9 +291,9 @@ export function UploadInvoice() {
         </div>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[.85fr_1.15fr]">
-          <section className="panel overflow-hidden xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)]">
+          <section className="panel min-w-0 overflow-hidden xl:sticky xl:top-24 xl:self-start">
             <div className="flex items-center justify-between border-b border-line px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-bold text-navy">{file?.name}</p><p className="text-xs text-slate-500">{result.pages} página{result.pages === 1 ? "" : "s"}</p></div><button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" onClick={() => { setFile(null); setResult(null); }}><X className="size-4" /></button></div>
-            {previewUrl && <iframe src={previewUrl} title="Vista previa del PDF" className="h-[640px] w-full bg-slate-100 xl:h-[calc(100%-65px)]" />}
+            {previewUrl && <PdfViewer url={previewUrl} fileName={file?.name || "Factura.pdf"} />}
           </section>
 
           <section className="space-y-5">

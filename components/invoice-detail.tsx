@@ -7,8 +7,6 @@ import {
   Check,
   CheckCircle2,
   Clock3,
-  Download,
-  ExternalLink,
   FileText,
   LoaderCircle,
   ShieldCheck,
@@ -17,7 +15,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getPdfBlob } from "@/lib/storage";
-import { createManagedPdfUrl, supportsInlinePdfPreview } from "@/lib/pdf-preview";
+import { createManagedPdfUrl } from "@/lib/pdf-preview";
+import { PdfViewer } from "./pdf-viewer";
 import { useAppStore } from "@/lib/store";
 import { formatCurrency, formatDate, formatDateTime, formatFileSize } from "@/lib/utils";
 import { PageHeader, StatusBadge } from "./ui";
@@ -29,16 +28,11 @@ export function InvoiceDetail() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState("");
-  const [inlinePreview, setInlinePreview] = useState(true);
   const [rejecting, setRejecting] = useState(false);
   const [confirmingApproval, setConfirmingApproval] = useState(false);
   const [reason, setReason] = useState("");
   const [workflowError, setWorkflowError] = useState("");
   const transitionLock = useRef("");
-
-  useEffect(() => {
-    setInlinePreview(supportsInlinePdfPreview(window.navigator.userAgent));
-  }, []);
 
   useEffect(() => {
     transitionLock.current = "";
@@ -128,17 +122,14 @@ export function InvoiceDetail() {
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
-        <section className="panel overflow-hidden xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)]">
+        <section className="panel min-w-0 overflow-hidden xl:sticky xl:top-24 xl:self-start">
           <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
             <div className="min-w-0"><p className="truncate text-sm font-bold text-navy">{invoice.pdfName}</p><p className="mt-0.5 text-xs text-slate-500">{invoice.pages} página{invoice.pages === 1 ? "" : "s"} · {formatFileSize(invoice.pdfSize)}</p></div>
-            {pdfUrl && <div className="flex gap-2"><a href={pdfUrl} target="_blank" rel="noreferrer" className="btn-secondary !min-h-9 !px-3 !py-1.5"><ExternalLink className="size-4" /><span className="hidden sm:inline">Abrir</span></a><a href={pdfUrl} download={invoice.pdfName} className="btn-secondary !min-h-9 !px-3 !py-1.5"><Download className="size-4" /><span className="hidden sm:inline">Descargar</span></a></div>}
           </div>
           {loadingPdf ? (
             <div className="grid h-[600px] place-items-center bg-slate-100"><LoaderCircle className="size-7 animate-spin text-cobalt" /></div>
-          ) : pdfUrl && inlinePreview ? (
-            <iframe src={pdfUrl} title={`PDF de factura ${invoice.number}`} className="h-[640px] w-full bg-slate-100 xl:h-[calc(100%-66px)]" />
           ) : pdfUrl ? (
-            <div className="grid h-[600px] place-items-center bg-slate-50 p-8 text-center"><div><FileText className="mx-auto size-10 text-cobalt" /><p className="mt-4 text-sm font-bold text-navy">Vista previa no disponible en este navegador</p><p className="mt-2 max-w-sm text-xs leading-5 text-slate-500">En Android podés abrir el documento con el visor instalado o descargarlo sin enviarlo a servicios externos.</p><div className="mt-5 flex justify-center gap-2"><a href={pdfUrl} target="_blank" rel="noreferrer" className="btn-primary"><ExternalLink className="size-4" />Abrir PDF</a><a href={pdfUrl} download={invoice.pdfName} className="btn-secondary"><Download className="size-4" />Descargar</a></div></div></div>
+            <PdfViewer url={pdfUrl} fileName={invoice.pdfName} />
           ) : (
             <div className="grid h-[600px] place-items-center bg-slate-50 p-8 text-center"><div><AlertTriangle className="mx-auto size-8 text-amber-500" /><p className="mt-3 text-sm font-semibold text-slate-600">El PDF no está disponible.</p><p className="mt-1 text-xs text-slate-500">{pdfError || "Los metadatos se conservaron, pero el archivo local no pudo recuperarse."}</p></div></div>
           )}
