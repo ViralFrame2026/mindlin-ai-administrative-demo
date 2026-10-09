@@ -59,6 +59,8 @@ describe("POST /api/extract-pdf", () => {
 
   it("devuelve JSON válido cuando el PDF está dañado", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const info = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const response = await postPdf(
       new File(["%PDF-1.7\ncontenido truncado"], "dañado.pdf", { type: "application/pdf" }),
     );
@@ -70,6 +72,8 @@ describe("POST /api/extract-pdf", () => {
     expect(payload.requestId).toBeTruthy();
     expect(log).toHaveBeenCalled();
     log.mockRestore();
+    info.mockRestore();
+    warning.mockRestore();
   });
 
   it("rechaza antes de parsear un archivo que excede el límite de Vercel", async () => {

@@ -6,7 +6,7 @@ Prototipo funcional de un dashboard administrativo para cargar, extraer, validar
 
 - Dashboard responsive con métricas, cola de trabajo y estado del circuito.
 - Carga, vista previa y descarga de facturas PDF.
-- Extracción real de la capa de texto mediante `pdf-parse` en una Route Handler de Node.js.
+- Extracción real de la capa de texto mediante `pdf2json` en una Route Handler de Node.js, sin canvas ni APIs gráficas del navegador.
 - Interpretación editable de proveedor, CUIT, comprobante, fechas e importes.
 - Validación del dígito verificador de CUIT y consistencia `neto + IVA = total`.
 - Detección de duplicados por hash SHA-256 o por CUIT + punto de venta + número.
@@ -18,7 +18,7 @@ Prototipo funcional de un dashboard administrativo para cargar, extraer, validar
 
 ## Ejecutar localmente
 
-Requisitos: Node.js 20.9 o superior y npm.
+Requisitos: Node.js 24 y npm.
 
 ```bash
 npm install
@@ -49,7 +49,7 @@ npm run generate:samples
 4. Revisar los campos detectados. Como el comprobante también existe en los datos iniciales, se mostrará la detección de duplicado.
 5. Para probar un alta sin duplicado, editar el número antes de guardar.
 
-La ruta `POST /api/extract-pdf` recibe el binario PDF, extrae su texto con `pdf-parse` y devuelve campos estructurados junto con una vista previa. La extracción no está hardcodeada contra los archivos de muestra. El tamaño máximo es 4 MB para respetar el límite de payload de Vercel Functions, incluido el margen del formulario multipart.
+La ruta `POST /api/extract-pdf` recibe el binario PDF, extrae su texto con `pdf2json` y devuelve campos estructurados junto con una vista previa. La extracción no está hardcodeada contra los archivos de muestra. El tamaño máximo es 4 MB para respetar el límite de payload de Vercel Functions, incluido el margen del formulario multipart.
 
 ## Persistencia y reinicio
 
@@ -62,7 +62,7 @@ El botón **Reiniciar demo** restaura los datos ficticios y elimina PDFs que el 
 
 ## Despliegue en Vercel
 
-El proyecto usa el runtime Node.js para la extracción de PDF. `package.json` declara Node `>=22.3 <25`, compatible con `pdf-parse@2.4.5`:
+El proyecto usa el runtime Node.js 24 para la extracción de PDF. `pdf2json` ejecuta el parser con un canvas de datos en memoria y no requiere `DOMMatrix`, `ImageData`, `Path2D` ni `@napi-rs/canvas`:
 
 ```bash
 vercel
