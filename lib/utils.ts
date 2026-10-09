@@ -22,6 +22,7 @@ export function formatDate(value: string) {
 
 export function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("es-AR", {
+    year: "numeric",
     day: "2-digit",
     month: "short",
     hour: "2-digit",

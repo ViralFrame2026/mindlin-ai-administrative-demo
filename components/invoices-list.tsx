@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Download, FileText, Filter, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { matchesInvoiceSearch } from "@/lib/invoice-search";
 import { invoicesToCsv } from "@/lib/csv";
 import { useAppStore } from "@/lib/store";
 import type { InvoiceStatus } from "@/lib/types";
@@ -25,10 +26,7 @@ export function InvoicesList() {
     const needle = search.trim().toLowerCase();
     return invoices.filter((invoice) => {
       const matchesStatus = status === "all" || invoice.status === status;
-      const matchesSearch = !needle || [invoice.supplier.name, invoice.supplier.cuit, invoice.number, invoice.pointOfSale]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle);
+      const matchesSearch = matchesInvoiceSearch(invoice, needle);
       return matchesStatus && matchesSearch;
     });
   }, [invoices, search, status]);
@@ -56,22 +54,23 @@ export function InvoicesList() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <label className="relative block max-w-lg flex-1">
               <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} className="field pl-10" placeholder="Buscar por proveedor, CUIT o comprobante…" />
+              <input aria-label="Buscar facturas" type="search" value={search} onChange={(event) => setSearch(event.target.value)} className="field pl-10" placeholder="Buscar por proveedor, CUIT o comprobante…" />
             </label>
             <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
               <Filter className="size-4 shrink-0 text-slate-400" />
               {filters.map((filter) => (
                 <button
                   key={filter.value}
+                  aria-pressed={status === filter.value}
                   onClick={() => setStatus(filter.value)}
-                  className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition ${status === filter.value ? "bg-navy text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                  className={`min-h-11 shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition ${status === filter.value ? "bg-navy text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
                 >
                   {filter.label}
                 </button>
               ))}
             </div>
           </div>
-          <p className="mt-3 text-xs font-medium text-slate-400">{visible.length} de {invoices.length} comprobantes</p>
+          <p role="status" className="mt-3 text-xs font-medium text-slate-500">{visible.length} de {invoices.length} comprobantes</p>
         </div>
 
         <div className="hidden overflow-x-auto md:block">

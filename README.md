@@ -87,6 +87,8 @@ El botón **Reiniciar demo** solicita confirmación y restaura las cuatro factur
 
 La migración y las garantías de integridad están documentadas en [`docs/administrative-integrity.md`](docs/administrative-integrity.md).
 
+Las mejoras de navegación, accesibilidad, búsqueda y CSV se describen en [`docs/professional-administrative-ux.md`](docs/professional-administrative-ux.md).
+
 ## Pruebas cubiertas
 
 - Extracción real de cuatro PDFs digitales con órdenes y etiquetas diferentes.

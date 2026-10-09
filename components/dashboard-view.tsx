@@ -160,7 +160,7 @@ export function DashboardView() {
             <div
               className="relative grid size-40 shrink-0 place-items-center rounded-full"
               style={{
-                background: `conic-gradient(#10b981 0 ${(statusCount("approved") / totalCount) * 100}%, #f59e0b 0 ${((statusCount("approved") + statusCount("pending")) / totalCount) * 100}%, #3b82f6 0 ${((statusCount("approved") + statusCount("pending") + statusCount("needs_review")) / totalCount) * 100}%, #f43f5e 0)`,
+                background: invoices.length ? `conic-gradient(#10b981 0 ${(statusCount("approved") / totalCount) * 100}%, #f59e0b 0 ${((statusCount("approved") + statusCount("pending")) / totalCount) * 100}%, #3b82f6 0 ${((statusCount("approved") + statusCount("pending") + statusCount("needs_review")) / totalCount) * 100}%, #f43f5e 0)` : "#e2e8f0",
               }}
             >
               <div className="grid size-28 place-items-center rounded-full bg-white text-center">

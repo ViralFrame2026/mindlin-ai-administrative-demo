@@ -1,15 +1,15 @@
 import type { HistoryEntry, Invoice } from "./types";
 
-const statusLabels: Record<Invoice["status"], string> = {
-  pending: "Pendiente",
-  needs_review: "En revisión",
-  approved: "Aprobada",
-  rejected: "Rechazada",
-};
+import { STATUS_LABELS, ACTION_LABELS, traceDescription } from "./presentation";
 
 function escapeCsv(value: unknown) {
   const stringValue = String(value ?? "");
-  return `"${stringValue.replace(/"/g, '""')}"`;
+  const safeValue =
+    /^[\s\u0000-\u001f\u007f]*[=+\-@]/.test(stringValue) ||
+    /^[\t\r\n]/.test(stringValue)
+      ? `'${stringValue}`
+      : stringValue;
+  return `"${safeValue.replace(/"/g, '""')}"`;
 }
 
 export function invoicesToCsv(invoices: Invoice[]) {
@@ -39,24 +39,37 @@ export function invoicesToCsv(invoices: Invoice[]) {
     invoice.amounts.vat.toFixed(2),
     invoice.amounts.total.toFixed(2),
     invoice.retentionTotal.toFixed(2),
-    statusLabels[invoice.status],
+    STATUS_LABELS[invoice.status],
     invoice.rejectionReason ?? "",
-    invoice.source,
+    invoice.source === "demo" ? "Ejemplo ficticio" : "PDF cargado",
   ]);
-  return [headers, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n");
+  return [headers, ...rows]
+    .map((row) => row.map(escapeCsv).join(","))
+    .join("\n");
 }
 
 export function historyToCsv(history: HistoryEntry[]) {
-  const headers = ["Fecha", "Acción", "Estado anterior", "Estado nuevo", "Comprobante", "Descripción", "Motivo", "Usuario"];
+  const headers = [
+    "Fecha",
+    "Acción",
+    "Estado anterior",
+    "Estado nuevo",
+    "Comprobante",
+    "Descripción",
+    "Motivo",
+    "Usuario",
+  ];
   const rows = history.map((entry) => [
     entry.timestamp,
-    entry.action,
-    entry.fromStatus ?? "",
-    entry.toStatus ?? "",
+    ACTION_LABELS[entry.action],
+    entry.fromStatus ? STATUS_LABELS[entry.fromStatus] : "",
+    entry.toStatus ? STATUS_LABELS[entry.toStatus] : "",
     entry.invoiceNumber ?? "",
-    entry.description,
+    traceDescription(entry.description),
     entry.reason ?? "",
     entry.actor,
   ]);
-  return [headers, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n");
+  return [headers, ...rows]
+    .map((row) => row.map(escapeCsv).join(","))
+    .join("\n");
 }
