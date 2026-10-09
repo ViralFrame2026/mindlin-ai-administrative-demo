@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { parseInvoiceText } from "@/lib/extraction";
 import { MAX_PDF_FILE_SIZE, MAX_PDF_FILE_SIZE_LABEL } from "@/lib/pdf-constraints";
+import { createPdfTextExtractor, type PdfTextExtractor } from "@/lib/pdf-text-extractor";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -102,16 +103,15 @@ export async function POST(request: Request) {
     );
   }
 
-  let PdfParser: (typeof import("pdf-parse"))["PDFParse"];
+  let extractor: PdfTextExtractor;
   try {
-    // Keep module initialization inside the guarded request flow. If Vercel
-    // cannot load pdfjs/native dependencies, the client still receives JSON.
-    ({ PDFParse: PdfParser } = await import("pdf-parse"));
+    extractor = await createPdfTextExtractor(new Uint8Array(await file.arrayBuffer()));
   } catch (error) {
     logServerError("pdf_runtime_load_failed", error, requestId, {
       fileName: file.name,
       fileSize: file.size,
       nodeVersion: process.version,
+      extractor: "pdf2json",
     });
     return jsonResponse(
       { error: "El servicio de lectura de PDF no está disponible temporalmente.", code: "PDF_RUNTIME_UNAVAILABLE" },
@@ -120,9 +120,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const parser = new PdfParser({ data: new Uint8Array(await file.arrayBuffer()) });
   try {
-    const result = await withTimeout(parser.getText());
+    const result = await withTimeout(extractor.extract());
     const text = result.text.trim();
     if (text.length < 20) {
       return jsonResponse(
@@ -137,7 +136,7 @@ export async function POST(request: Request) {
     return jsonResponse(
       {
         data: parseInvoiceText(text),
-        pages: result.total,
+        pages: result.pages,
         textPreview: text.slice(0, 700),
       },
       200,
@@ -149,6 +148,7 @@ export async function POST(request: Request) {
       fileName: file.name,
       fileSize: file.size,
       nodeVersion: process.version,
+      extractor: "pdf2json",
     });
     return jsonResponse(
       timedOut
@@ -159,7 +159,7 @@ export async function POST(request: Request) {
     );
   } finally {
     try {
-      await parser.destroy();
+      extractor.destroy();
     } catch (error) {
       logServerError("pdf_parser_cleanup_failed", error, requestId, { fileName: file.name });
     }
