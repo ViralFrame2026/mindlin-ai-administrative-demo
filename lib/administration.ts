@@ -1,3 +1,4 @@
+import { STATUS_LABELS } from "./presentation";
 import { DEMO_HISTORY, DEMO_INVOICES } from "./demo-data";
 import {
   calculateRetentions,
@@ -164,7 +165,7 @@ export function changeAdministrativeStatus(
           : target === "rejected"
             ? "rejected"
             : "review_started",
-        `Factura ${original.pointOfSale}-${original.number}: ${original.status} → ${target}.`,
+        `Factura ${original.pointOfSale}-${original.number}: ${STATUS_LABELS[original.status]} → ${STATUS_LABELS[target]}.`,
         {
           invoiceId: id,
           invoiceNumber: `${original.pointOfSale}-${original.number}`,

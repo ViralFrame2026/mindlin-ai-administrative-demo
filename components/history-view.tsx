@@ -11,6 +11,7 @@ import {
   Settings2,
   XCircle,
 } from "lucide-react";
+import { traceDescription } from "@/lib/presentation";
 import { historyToCsv } from "@/lib/csv";
 import { useAppStore } from "@/lib/store";
 import type { HistoryAction } from "@/lib/types";
@@ -112,7 +113,7 @@ export function HistoryView() {
                     </time>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {entry.description}
+                    {traceDescription(entry.description)}
                   </p>
                   {entry.reason && (
                     <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">

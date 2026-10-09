@@ -1,3 +1,4 @@
+import { STATUS_LABELS } from "./presentation";
 import { invoiceData, validateInvoice } from "./validation";
 import type { Invoice, InvoiceStatus } from "./types";
 
@@ -25,7 +26,7 @@ export function validateStatusTransition(
   if (!ALLOWED_TRANSITIONS[invoice.status].includes(target)) {
     return {
       allowed: false,
-      error: `No se permite cambiar una factura ${invoice.status} a ${target}.`,
+      error: `No se permite cambiar una factura ${STATUS_LABELS[invoice.status]} a ${STATUS_LABELS[target]}.`,
     };
   }
 
