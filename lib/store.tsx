@@ -1,194 +1,262 @@
 "use client";
-
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { DEMO_HISTORY, DEMO_INVOICES } from "./demo-data";
-import { calculateRetentions, DEFAULT_RETENTION_RULES } from "./retention";
-import { clearPdfBlobs, savePdfBlob } from "./storage";
-import { DEMO_ACTOR, type HistoryEntry, type Invoice, type InvoiceStatus, type RetentionRule } from "./types";
-import { uid } from "./utils";
-import { invoiceKey } from "./validation";
-import { initializeInvoiceWorkflow, transitionInvoice, validateStatusTransition } from "./workflow";
-
-const INVOICE_KEY = "mindlin.invoices.v1";
-const RULES_KEY = "mindlin.retention-rules.v1";
-const HISTORY_KEY = "mindlin.history.v1";
-
-interface AppStoreValue {
-  invoices: Invoice[];
-  rules: RetentionRule[];
-  history: HistoryEntry[];
-  hydrated: boolean;
-  addInvoice: (invoice: Invoice, file: File) => Promise<void>;
-  updateInvoiceStatus: (invoiceId: string, status: InvoiceStatus, reason?: string) => StatusUpdateResult;
-  updateRules: (rules: RetentionRule[]) => void;
-  resetDemo: () => Promise<void>;
-}
-
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  initialState,
+  addAdministrativeInvoice,
+  changeAdministrativeStatus,
+  changeAdministrativeRules,
+  recalculateAdministrativeInvoice,
+} from "./administration";
+import { transactState, readRawAdministrativeState } from "./storage";
+import type { AdministrativeState } from "./state-schema";
+import {
+  DEMO_ACTOR,
+  type Invoice,
+  type InvoiceStatus,
+  type RetentionRule,
+} from "./types";
+import { downloadTextFile, uid } from "./utils";
 export interface StatusUpdateResult {
   ok: boolean;
   error?: string;
 }
-
-const AppStore = createContext<AppStoreValue | null>(null);
-
-function readStorage<T>(key: string, fallback: T): T {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved ? (JSON.parse(saved) as T) : fallback;
-  } catch {
-    return fallback;
-  }
+interface AppStoreValue extends AdministrativeState {
+  hydrated: boolean;
+  addInvoice: (invoice: Invoice, file: File) => Promise<void>;
+  updateInvoiceStatus: (
+    id: string,
+    status: InvoiceStatus,
+    reason?: string,
+  ) => Promise<StatusUpdateResult>;
+  updateRules: (rules: RetentionRule[]) => Promise<void>;
+  recalculateInvoice: (id: string, reason: string) => Promise<void>;
+  resetDemo: () => Promise<void>;
 }
-
+const AppStore = createContext<AppStoreValue | null>(null);
 export function AppStoreProvider({ children }: { children: React.ReactNode }) {
-  const [invoices, setInvoices] = useState<Invoice[]>(DEMO_INVOICES);
-  const [rules, setRules] = useState<RetentionRule[]>(DEFAULT_RETENTION_RULES);
-  const [history, setHistory] = useState<HistoryEntry[]>(DEMO_HISTORY);
+  const [state, setState] = useState<AdministrativeState>(() => initialState());
   const [hydrated, setHydrated] = useState(false);
-  const pendingAdds = useRef(new Set<string>());
-
+  const [error, setError] = useState("");
+  const channel = useRef<BroadcastChannel | null>(null);
+  const apply = useCallback(
+    (next: AdministrativeState) =>
+      setState((current) =>
+        next.revision >= current.revision ? next : current,
+      ),
+    [],
+  );
   useEffect(() => {
-    setInvoices(readStorage(INVOICE_KEY, DEMO_INVOICES));
-    setRules(readStorage(RULES_KEY, DEFAULT_RETENTION_RULES));
-    setHistory(readStorage(HISTORY_KEY, DEMO_HISTORY));
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (hydrated) localStorage.setItem(INVOICE_KEY, JSON.stringify(invoices));
-  }, [hydrated, invoices]);
-
-  useEffect(() => {
-    if (hydrated) localStorage.setItem(RULES_KEY, JSON.stringify(rules));
-  }, [hydrated, rules]);
-
-  useEffect(() => {
-    if (hydrated) localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-  }, [history, hydrated]);
-
-  const addInvoice = useCallback(async (invoice: Invoice, file: File) => {
-    if (!invoice.pdfStorageKey) throw new Error("Falta la clave de almacenamiento del PDF.");
-    const businessKey = invoiceKey(invoice);
-    const hashKey = invoice.pdfHash ? `hash:${invoice.pdfHash}` : "";
-    const duplicate = invoices.find(
-      (existing) => (invoice.pdfHash && existing.pdfHash === invoice.pdfHash) || invoiceKey(existing) === businessKey,
-    );
-    if (duplicate || pendingAdds.current.has(businessKey) || (hashKey && pendingAdds.current.has(hashKey))) {
-      throw new Error(duplicate
-        ? `La factura ya existe como ${duplicate.pointOfSale}-${duplicate.number}.`
-        : "La misma factura ya se está guardando.");
+    let active = true;
+    const refresh = () =>
+      transactState(() => initialState(localStorage))
+        .then((next) => {
+          if (active) {
+            apply(next);
+            setHydrated(true);
+          }
+        })
+        .catch((cause) => {
+          console.error("[local-state]", cause);
+          if (active)
+            setError(
+              cause instanceof Error
+                ? cause.message
+                : "No se pudo abrir el almacenamiento local.",
+            );
+        });
+    if (typeof BroadcastChannel !== "undefined") {
+      channel.current = new BroadcastChannel("mindlin-administration-v2");
+      channel.current.onmessage = refresh;
     }
-    pendingAdds.current.add(businessKey);
-    if (hashKey) pendingAdds.current.add(hashKey);
-    const pendingInvoice = initializeInvoiceWorkflow(invoice);
-    try {
-      await savePdfBlob(invoice.pdfStorageKey, file);
-      setInvoices((current) => [pendingInvoice, ...current]);
-      setHistory((current) => [
-        {
-          id: uid("history"),
-          action: "uploaded",
-          description: `Factura ${invoice.pointOfSale}-${invoice.number} cargada desde PDF en estado Pendiente.`,
-          timestamp: new Date().toISOString(),
-          actor: DEMO_ACTOR,
-          invoiceId: invoice.id,
-          invoiceNumber: `${invoice.pointOfSale}-${invoice.number}`,
-        },
-        ...current,
-      ]);
-    } finally {
-      pendingAdds.current.delete(businessKey);
-      if (hashKey) pendingAdds.current.delete(hashKey);
-    }
-  }, [invoices]);
-
-  const updateInvoiceStatus = useCallback(
-    (invoiceId: string, status: InvoiceStatus, reason?: string) => {
-      const target = invoices.find((invoice) => invoice.id === invoiceId);
-      if (!target) return { ok: false, error: "No se encontró la factura." };
-      const validation = validateStatusTransition(target, status, reason);
-      if (!validation.allowed) return { ok: false, error: validation.error };
-      const timestamp = new Date().toISOString();
-      setInvoices((current) =>
-        current.map((invoice) =>
-          invoice.id === invoiceId
-            ? transitionInvoice(invoice, status, reason, timestamp)
-            : invoice,
-        ),
-      );
-      const action = status === "needs_review" ? "review_started" : status === "approved" ? "approved" : "rejected";
-      const invoiceNumber = `${target.pointOfSale}-${target.number}`;
-      const description = status === "needs_review"
-        ? `Factura ${invoiceNumber} enviada a revisión administrativa.`
-        : status === "approved"
-          ? `Factura ${invoiceNumber} aprobada por confirmación explícita.`
-          : `Factura ${invoiceNumber} rechazada. Motivo: ${reason?.trim()}.`;
-      setHistory((current) => [
-        {
-          id: uid("history"),
-          action,
-          description,
-          timestamp,
-          actor: DEMO_ACTOR,
-          invoiceId,
-          invoiceNumber,
-          reason: status === "rejected" ? reason?.trim() : undefined,
-          fromStatus: target.status,
-          toStatus: status,
-        },
-        ...current,
-      ]);
-      return { ok: true };
+    const focus = () => {
+      void refresh();
+    };
+    window.addEventListener("focus", focus);
+    window.addEventListener("pageshow", focus);
+    void refresh();
+    return () => {
+      active = false;
+      channel.current?.close();
+      channel.current = null;
+      window.removeEventListener("focus", focus);
+      window.removeEventListener("pageshow", focus);
+    };
+  }, [apply]);
+  const commit = useCallback(
+    async (operation: Parameters<typeof transactState>[1]) => {
+      try {
+        const next = await transactState(
+          () => initialState(localStorage),
+          operation,
+        );
+        apply(next);
+        channel.current?.postMessage({ revision: next.revision });
+      } catch (cause) {
+        console.error("[local-operation] Operación no confirmada", cause);
+        try {
+          apply(await transactState(() => initialState(localStorage)));
+        } catch {}
+        throw cause;
+      }
     },
-    [invoices],
+    [apply],
   );
-
-  const updateRules = useCallback((nextRules: RetentionRule[]) => {
-    setRules(nextRules);
-    setInvoices((current) =>
-      current.map((invoice) => {
-        const retention = calculateRetentions(invoice.amounts, nextRules);
-        return { ...invoice, retentionLines: retention.lines, retentionTotal: retention.total };
-      }),
-    );
-    setHistory((current) => [
-      {
-        id: uid("history"),
-        action: "rules_updated",
-        description: "Se actualizaron las reglas demostrativas de retención y se recalcularon las facturas.",
-        timestamp: new Date().toISOString(),
-        actor: DEMO_ACTOR,
-      },
-      ...current,
-    ]);
-  }, []);
-
+  const addInvoice = useCallback(
+    async (invoice: Invoice, file: File) => {
+      await commit((current, pdfs) => {
+        if (!invoice.pdfStorageKey) throw new Error("Falta el archivo PDF.");
+        const next = addAdministrativeInvoice(current, invoice);
+        pdfs.put(file, invoice.pdfStorageKey);
+        return next;
+      });
+    },
+    [commit],
+  );
+  const updateInvoiceStatus = useCallback(
+    async (
+      id: string,
+      status: InvoiceStatus,
+      reason?: string,
+    ): Promise<StatusUpdateResult> => {
+      try {
+        const expected =
+          state.invoices.find((item) => item.id === id)?.revision ?? 0;
+        await commit((current) =>
+          changeAdministrativeStatus(current, id, expected, status, reason),
+        );
+        return { ok: true };
+      } catch (cause) {
+        return {
+          ok: false,
+          error:
+            cause instanceof Error
+              ? cause.message
+              : "No se confirmó el cambio de estado.",
+        };
+      }
+    },
+    [commit, state.invoices],
+  );
+  const updateRules = useCallback(
+    async (rules: RetentionRule[]) => {
+      await commit((current) =>
+        changeAdministrativeRules(current, rules, state.rulesVersion),
+      );
+    },
+    [commit, state.rulesVersion],
+  );
+  const recalculateInvoice = useCallback(
+    async (id: string, reason: string) => {
+      const expected =
+        state.invoices.find((item) => item.id === id)?.revision ?? 0;
+      await commit((current) =>
+        recalculateAdministrativeInvoice(current, id, expected, reason),
+      );
+    },
+    [commit, state.invoices],
+  );
   const resetDemo = useCallback(async () => {
-    await clearPdfBlobs();
-    setInvoices(DEMO_INVOICES);
-    setRules(DEFAULT_RETENTION_RULES);
-    setHistory([
-      {
-        id: uid("history"),
-        action: "demo_reset",
-        description: "Se restauraron los datos ficticios de la demostración.",
-        timestamp: new Date().toISOString(),
-        actor: DEMO_ACTOR,
-      },
-      ...DEMO_HISTORY,
-    ]);
-  }, []);
-
+    if (
+      !window.confirm(
+        "Se borrarán todas las facturas y PDFs locales, incluidos los cargados por vos. ¿Restaurar la demo?",
+      )
+    )
+      return;
+    await commit((current, pdfs) => {
+      pdfs.clear();
+      const seed = initialState();
+      return {
+        ...seed,
+        rulesVersion: current.rulesVersion + 1,
+        history: [
+          {
+            id: uid("history"),
+            action: "demo_reset",
+            description:
+              "Se restauraron los datos ficticios tras confirmación explícita y se eliminaron los PDFs locales.",
+            timestamp: new Date().toISOString(),
+            actor: DEMO_ACTOR,
+          },
+          ...seed.history,
+        ],
+        invoices: seed.invoices.map((item) => ({
+          ...item,
+          retentionRulesVersion: current.rulesVersion + 1,
+          revision:
+            (current.invoices.find((previous) => previous.id === item.id)
+              ?.revision ?? 0) + 1,
+        })),
+      };
+    });
+  }, [commit]);
   const value = useMemo(
-    () => ({ invoices, rules, history, hydrated, addInvoice, updateInvoiceStatus, updateRules, resetDemo }),
-    [invoices, rules, history, hydrated, addInvoice, updateInvoiceStatus, updateRules, resetDemo],
+    () => ({
+      ...state,
+      hydrated,
+      addInvoice,
+      updateInvoiceStatus,
+      updateRules,
+      recalculateInvoice,
+      resetDemo,
+    }),
+    [
+      state,
+      hydrated,
+      addInvoice,
+      updateInvoiceStatus,
+      updateRules,
+      recalculateInvoice,
+      resetDemo,
+    ],
   );
-
+  if (!hydrated)
+    return (
+      <div className="panel m-6 p-6" role={error ? "alert" : "status"}>
+        {error || "Preparando datos locales…"}
+        {error && (
+          <button
+            className="btn-secondary mt-4"
+            onClick={async () => {
+              try {
+                const current = await readRawAdministrativeState();
+                const legacy = Object.fromEntries(
+                  [
+                    "mindlin.invoices.v1",
+                    "mindlin.retention-rules.v1",
+                    "mindlin.history.v1",
+                  ].map((key) => [key, localStorage.getItem(key)]),
+                );
+                downloadTextFile(
+                  JSON.stringify({ current, legacy }, null, 2),
+                  "mindlin-recuperacion.json",
+                  "application/json",
+                );
+              } catch (cause) {
+                console.error("[local-recovery]", cause);
+                setError(
+                  "No se pudo descargar la copia. Conservá este navegador y solicitá recuperación técnica.",
+                );
+              }
+            }}
+          >
+            Descargar copia para recuperación
+          </button>
+        )}
+      </div>
+    );
   return <AppStore.Provider value={value}>{children}</AppStore.Provider>;
 }
-
 export function useAppStore() {
   const store = useContext(AppStore);
-  if (!store) throw new Error("useAppStore debe usarse dentro de AppStoreProvider.");
+  if (!store)
+    throw new Error("useAppStore debe usarse dentro de AppStoreProvider.");
   return store;
 }

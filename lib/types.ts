@@ -1,4 +1,8 @@
-export type InvoiceStatus = "pending" | "needs_review" | "approved" | "rejected";
+export type InvoiceStatus =
+  | "pending"
+  | "needs_review"
+  | "approved"
+  | "rejected";
 export type InvoiceSource = "demo" | "uploaded";
 
 export const DEMO_ACTOR = "María González · usuario demo";
@@ -56,6 +60,11 @@ export interface Invoice {
   retentionLines: RetentionLine[];
   retentionTotal: number;
   rejectionReason?: string;
+  revision?: number;
+  extractionWarnings?: string[];
+  extractionConfirmed?: boolean;
+  retentionRulesVersion?: number;
+  retentionRulesSnapshot?: RetentionRule[];
 }
 
 export interface ExtractedInvoiceData {
@@ -88,7 +97,8 @@ export type HistoryAction =
   | "approved"
   | "rejected"
   | "rules_updated"
-  | "demo_reset";
+  | "demo_reset"
+  | "retention_recalculated";
 
 export interface HistoryEntry {
   id: string;
@@ -101,4 +111,6 @@ export interface HistoryEntry {
   reason?: string;
   fromStatus?: InvoiceStatus;
   toStatus?: InvoiceStatus;
+  before?: unknown;
+  after?: unknown;
 }

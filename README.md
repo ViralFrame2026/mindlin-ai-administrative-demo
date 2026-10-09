@@ -15,7 +15,7 @@ Demo comercial 2.0 de un circuito administrativo para cargar, extraer, validar, 
 - Circuito obligatorio `Pendiente → En revisión → Aprobada/Rechazada`, confirmación explícita de aprobación y motivo obligatorio de rechazo.
 - Trazabilidad de actor demo, fecha, hora, acción, cambio de estado y motivo.
 - Historial de operaciones y exportación CSV de facturas o actividad.
-- Persistencia del estado en `localStorage` y de PDFs cargados en IndexedDB.
+- Persistencia transaccional de facturas, reglas, historial y PDFs en IndexedDB, con sincronización entre pestañas.
 - Visor PDF.js con páginas reales en canvas, zoom, navegación y ajuste responsive en móvil/escritorio, además de apertura y descarga del original.
 - Cuatro facturas ficticias de construcción, arquitectura, mantenimiento y logística, matemáticamente consistentes.
 - Carga de ejemplos con un clic: los PDFs recorren el endpoint y el extractor real, sin precargar campos.
@@ -25,7 +25,7 @@ Demo comercial 2.0 de un circuito administrativo para cargar, extraer, validar, 
 Requisitos: Node.js 24 y npm.
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -79,10 +79,13 @@ El encabezado identifica a `María González · Demo`. No existe autenticación,
 
 Toda la información de la demo queda en el navegador:
 
-- Metadatos, reglas e historial: `localStorage`.
-- Binarios PDF subidos: IndexedDB.
+- Metadatos, reglas e historial: IndexedDB, esquema administrativo v2.
+- Binarios PDF subidos: el mismo IndexedDB; se confirman junto con el alta y su historial.
+- Las claves antiguas de `localStorage` se conservan como copia de migración; ya no reciben escrituras.
 
-El botón **Reiniciar demo** restaura las cuatro facturas ficticias, sus distintos estados y el historial demostrativo; también elimina los PDFs que el usuario haya cargado. Al no existir backend, los datos no se sincronizan entre navegadores o dispositivos.
+El botón **Reiniciar demo** solicita confirmación y restaura las cuatro facturas ficticias, sus distintos estados y el historial demostrativo; también elimina los PDFs que el usuario haya cargado. Al no existir backend, los datos no se sincronizan entre navegadores o dispositivos.
+
+La migración y las garantías de integridad están documentadas en [`docs/administrative-integrity.md`](docs/administrative-integrity.md).
 
 ## Pruebas cubiertas
 
