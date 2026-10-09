@@ -1,3 +1,4 @@
+import { invoiceData, validateInvoice } from "./validation";
 import type { Invoice, InvoiceStatus } from "./types";
 
 export interface TransitionValidation {
@@ -28,10 +29,18 @@ export function validateStatusTransition(
     };
   }
 
-  if (target === "approved" && (invoice.validation.errors.length > 0 || invoice.validation.duplicate)) {
+  const fresh = validateInvoice(invoiceData(invoice), []);
+  if (
+    target === "approved" &&
+    (fresh.errors.length > 0 ||
+      invoice.validation.errors.length > 0 ||
+      invoice.validation.duplicate ||
+      (invoice.extractionWarnings?.length && !invoice.extractionConfirmed))
+  ) {
     return {
       allowed: false,
-      error: "La factura no puede aprobarse mientras tenga errores críticos o sea un duplicado.",
+      error:
+        "La factura no puede aprobarse mientras tenga errores críticos o sea un duplicado.",
     };
   }
 

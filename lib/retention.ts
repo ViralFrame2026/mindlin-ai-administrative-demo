@@ -34,7 +34,19 @@ function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-export function calculateRetentions(amounts: MoneyBreakdown, rules: RetentionRule[]) {
+export function calculateRetentions(
+  amounts: MoneyBreakdown,
+  rules: RetentionRule[],
+) {
+  validateRetentionRules(rules);
+  if (
+    ![amounts.net, amounts.vat, amounts.total].every(
+      (value) => Number.isFinite(value) && value >= 0,
+    )
+  )
+    throw new Error(
+      "Los importes de cálculo deben ser finitos y no negativos.",
+    );
   const lines: RetentionLine[] = rules
     .filter((rule) => rule.enabled)
     .map((rule) => {
@@ -54,4 +66,25 @@ export function calculateRetentions(amounts: MoneyBreakdown, rules: RetentionRul
     lines,
     total: roundMoney(lines.reduce((sum, line) => sum + line.amount, 0)),
   };
+}
+
+export function validateRetentionRules(rules: RetentionRule[]) {
+  if (
+    !rules.length ||
+    new Set(rules.map((rule) => rule.id)).size !== rules.length
+  )
+    throw new Error("Las reglas requieren identificadores únicos.");
+  for (const rule of rules) {
+    if (
+      !Number.isFinite(rule.rate) ||
+      rule.rate < 0 ||
+      rule.rate > 100 ||
+      !Number.isFinite(rule.minimum) ||
+      rule.minimum < 0 ||
+      !["net", "total"].includes(rule.base)
+    )
+      throw new Error(
+        "Las alícuotas deben estar entre 0 y 100 y los mínimos deben ser finitos no negativos.",
+      );
+  }
 }
