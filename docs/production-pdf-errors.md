@@ -63,7 +63,7 @@ Una terminación impuesta por la plataforma antes de ejecutar el handler no pued
 - timeout en texto plano;
 - JSON truncado con HTTP 200.
 
-`tests/pdf-runtime.test.ts` elimina expresamente `DOMMatrix`, `ImageData` y `Path2D`, comprueba que `@napi-rs/canvas` no está instalado y extrae el PDF multiconcepto sin recrear esos globals.
+`tests/pdf-runtime.test.ts` elimina expresamente `DOMMatrix`, `ImageData` y `Path2D` y extrae el PDF multiconcepto sin recrear esos globals. También verifica que el extractor no importe PDF.js ni canvas nativo. PDF.js se utiliza exclusivamente en el visor cliente; su dependencia opcional de canvas no se incluye en la ruta API de extracción.
 
 ## Limitaciones
 
